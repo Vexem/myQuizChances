@@ -66,13 +66,12 @@ In alternativa, senza attivare l'ambiente:
 .\.venv\Scripts\python.exe patente_gui.py
 ```
 
-L'applicazione si apre con tre schede:
+L'applicazione si apre con due schede:
 
 - **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
-- **Base**: stima standard sui risultati presenti nella sessione.
-- **Con ansia**: confronta lo scenario normale con uno scenario di stress usando la stessa sessione.
+- **Analisi**: stima standard oppure scenario con ansia, scelto tramite radio button.
 
-Le schede Base e Con ansia non permettono di inserire percorsi o caricare file: usano esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
+La scheda Analisi non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati. Il risultato e il grafico vengono mostrati in un popup dedicato, senza alterare il layout principale.
 
 ## Inserimento senza file
 
@@ -82,7 +81,12 @@ La scheda **Inserisci risultati** e una proposta alternativa al caricamento di E
 2. seleziona il numero di errori con la barra interattiva;
 3. premi **Aggiungi risultato**;
 4. ripeti per tutti i test della sessione;
-5. premi **Analizza risultati inseriti**.
+5. premi **Analizza risultati inseriti** per aprire il report in una finestra popup.
+
+Nella scheda **Analisi** puoi scegliere:
+
+- **Senza ansia**: calcolo standard;
+- **Con ansia**: calcolo standard e confronto con il moltiplicatore di ansia scelto.
 
 La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo non accetta testo libero, così il formato resta sempre coerente (`YYYY-MM-DD`).
 

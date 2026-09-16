@@ -155,7 +155,7 @@ class PatentGuiTestCase(unittest.TestCase):
 
         visit(self.app)
         scales = [widget for widget in widgets if isinstance(widget, tk.Scale)]
-        self.assertEqual(len(scales), 6)
+        self.assertEqual(len(scales), 4)
         self.assertEqual(scales[-1].cget('resolution'), 0.1)
         self.assertEqual(self.app.language_menu.index('end') + 1, 2)
 
@@ -164,8 +164,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.update_idletasks()
         self.assertEqual(self.app.language, 'en')
         self.assertEqual(self.app.notebook.tab(0, 'text'), 'Enter results')
-        self.assertEqual(self.app.notebook.tab(1, 'text'), 'Standard')
-        self.assertEqual(self.app.notebook.tab(2, 'text'), 'With anxiety')
+        self.assertEqual(self.app.notebook.tab(1, 'text'), 'Analysis')
 
     def test_gui_date_picker_selects_date(self):
         from datetime import date
@@ -181,8 +180,10 @@ class PatentGuiTestCase(unittest.TestCase):
     def test_gui_uses_correct_result_wording(self):
         records = [{"data": "2026-09-16", "errori": 1}]
         self.app.records.extend(records)
-        self.app._run_entry_analysis()
-        self.assertEqual(self.app.entry_result_title.cget('text'), 'Probabilità stimata di superamento')
+        self.app._open_entry_analysis()
+        self.app.update_idletasks()
+        self.assertEqual(self.app.popup_result_title.cget('text'), 'Probabilità stimata di superamento')
+        self.app.popup_result_title.winfo_toplevel().destroy()
 
 
 if __name__ == '__main__':

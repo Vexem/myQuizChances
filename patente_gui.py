@@ -30,7 +30,7 @@ class PatentApp(tk.Tk):
         self.language = "it"
         self.translations = {
             "it": {
-                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "base": "Base", "stress": "Con ansia", "english": "English",
+                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "base": "Analisi", "stress": "Con ansia", "english": "English",
                 "tests": "Numero di test da considerare", "tests_help": "Più alto è il numero, più lo storico è ampio. Il valore indica quanti test recenti includere.",
                 "half": "Emivita in giorni", "half_help": "Indica dopo quanti giorni un test vecchio perde metà della sua rilevanza. Valori bassi privilegiano i test recenti.",
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
@@ -40,9 +40,10 @@ class PatentApp(tk.Tk):
                 "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "saved_results": "Risultati inseriti", "no_entries": "Inserisci almeno un risultato.",
                 "today": "Oggi", "previous_month": "Mese precedente", "next_month": "Mese successivo", "calendar": "Apri calendario",
                 "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
+                "analysis_mode": "Valutazione ansia", "without_anxiety": "Senza ansia", "with_anxiety": "Con ansia", "close": "Chiudi",
             },
             "en": {
-                "title": "Driving test probability analysis", "entry": "Enter results", "base": "Standard", "stress": "With anxiety", "english": "Italiano",
+                "title": "Driving test probability analysis", "entry": "Enter results", "base": "Analysis", "stress": "With anxiety", "english": "Italiano",
                 "tests": "Number of tests to include", "tests_help": "A higher number gives a broader history. This is the number of recent tests included.",
                 "half": "Half-life in days", "half_help": "After this many days, an old test has half its relevance. Lower values favor recent tests.",
                 "anxiety": "Anxiety multiplier", "anxiety_help": "1.0 means normal conditions; higher values simulate performance loss under stress.",
@@ -52,6 +53,7 @@ class PatentApp(tk.Tk):
                 "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "saved_results": "Entered results", "no_entries": "Add at least one result.",
                 "today": "Today", "previous_month": "Previous month", "next_month": "Next month", "calendar": "Open calendar",
                 "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
+                "analysis_mode": "Anxiety evaluation", "without_anxiety": "Without anxiety", "with_anxiety": "With anxiety", "close": "Close",
             },
         }
         self._apply_theme()
@@ -82,7 +84,6 @@ class PatentApp(tk.Tk):
 
         self._build_entry_tab()
         self._build_base_tab()
-        self._build_stress_tab()
 
     def t(self, key):
         return self.translations[self.language][key]
@@ -129,7 +130,6 @@ class PatentApp(tk.Tk):
         self._build_language_selector()
         self._build_entry_tab()
         self._build_base_tab()
-        self._build_stress_tab()
 
     def _center_window(self):
         self.update_idletasks()
@@ -227,7 +227,9 @@ class PatentApp(tk.Tk):
         getattr(self, f"{prefix}_result_details").pack(fill="x", padx=18, pady=(0, 16))
 
     def _display_result(self, result, mode="base"):
-        prefix = mode if mode in ("base", "entry") else "stress"
+        is_popup = mode.startswith("popup_")
+        is_stress = mode in ("stress", "popup_stress")
+        prefix = "popup" if is_popup else ("stress" if is_stress else mode)
         title_widget = getattr(self, f"{prefix}_result_title")
         probability_widget = getattr(self, f"{prefix}_result_probability")
         details_widget = getattr(self, f"{prefix}_result_details")
@@ -236,7 +238,7 @@ class PatentApp(tk.Tk):
             probability_widget.configure(text="Errore", fg="#fca5a5")
             details_widget.configure(text=str(result))
             return
-        if mode in ("base", "entry"):
+        if not is_stress:
             probability = result["prob_predittiva"]
             title = "Probabilità stimata di superamento" if self.language == "it" else "Estimated passing probability"
             details = (f"{result['test_superati']} test su {result['test_analizzati']} entro la soglia di 3 errori\n"
@@ -261,11 +263,9 @@ class PatentApp(tk.Tk):
         frame = ttk.Frame(self.notebook, padding=16)
         self.notebook.add(frame, text=self.t("entry"))
         frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(5, weight=1)
 
         self.entry_date_var = tk.StringVar(value=date.today().isoformat())
         self.entry_errors_var = tk.DoubleVar(value=0)
-        self.entry_half_life_var = tk.DoubleVar(value=7)
 
         ttk.Label(frame, text=self.t("entry_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
         ttk.Label(frame, text=self.t("entry_date"), font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 4))
@@ -292,11 +292,7 @@ class PatentApp(tk.Tk):
         self.entry_tree.grid(row=9, column=0, sticky="nsew", pady=(0, 10))
         self._refresh_record_list()
 
-        ttk.Button(frame, text=self.t("analyze_entries"), command=self._run_entry_analysis).grid(row=10, column=0, sticky="w", pady=(4, 8))
-        self._result_panel(frame, 11, "entry")
-        self.entry_chart = tk.Frame(frame, bg="#111827", height=180)
-        self.entry_chart.grid(row=12, column=0, sticky="nsew", pady=(4, 0))
-        frame.rowconfigure(11, weight=1)
+        ttk.Button(frame, text=self.t("analyze_entries"), command=self._open_entry_analysis).grid(row=10, column=0, sticky="w", pady=(4, 8))
 
     def _refresh_record_list(self):
         if not hasattr(self, "entry_tree"):
@@ -413,16 +409,11 @@ class PatentApp(tk.Tk):
         self.records.clear()
         self._refresh_record_list()
 
-    def _run_entry_analysis(self):
-        try:
-            if not self.records:
-                raise ValueError(self.t("no_entries"))
-            result = analizza_predizione_records(self.records, emivita_giorni=7)
-            self._display_result(result, "entry")
-            self._show_records_chart(self.entry_chart, self.records)
-        except Exception as error:
-            messagebox.showerror("Errore", str(error))
-            self._display_result(f"Errore: {error}", "entry")
+    def _open_entry_analysis(self):
+        if not self.records:
+            messagebox.showerror("Errore", self.t("no_entries"))
+            return
+        self._open_analysis_popup(self.records, emivita_giorni=7, anxiety_enabled=False)
 
     def _build_base_tab(self):
         frame = ttk.Frame(self.notebook, padding=16)
@@ -430,6 +421,8 @@ class PatentApp(tk.Tk):
 
         self.n_test_var = tk.DoubleVar(value=50)
         self.half_life_var = tk.DoubleVar(value=7)
+        self.anxiety_factor_var = tk.DoubleVar(value=1.2)
+        self.analysis_mode_var = tk.StringVar(value="base")
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(2, weight=1)
         ttk.Label(frame, text=self.t("session_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
@@ -457,72 +450,32 @@ class PatentApp(tk.Tk):
             formatter=lambda value: f"{float(value):.0f} giorni",
         )
 
-        ttk.Button(frame, text=self.t("calculate"), command=self._run_base_analysis).grid(row=9, column=0, sticky="w", pady=(14, 8))
-        self._result_panel(frame, 10, "base")
+        ttk.Label(frame, text=self.t("analysis_mode"), font=("Segoe UI", 10, "bold")).grid(row=8, column=0, sticky="w", pady=(12, 4))
+        mode_frame = ttk.Frame(frame)
+        mode_frame.grid(row=9, column=0, sticky="w", pady=(0, 4))
+        self.anxiety_without_radio = tk.Radiobutton(mode_frame, text=self.t("without_anxiety"), variable=self.analysis_mode_var, value="base", command=self._toggle_anxiety_slider, bg="#0b1220", fg="#dbeafe", activebackground="#0b1220", activeforeground="#67e8f9", selectcolor="#162033", font=("Segoe UI", 9))
+        self.anxiety_without_radio.pack(side="left", padx=(0, 18))
+        self.anxiety_with_radio = tk.Radiobutton(mode_frame, text=self.t("with_anxiety"), variable=self.analysis_mode_var, value="stress", command=self._toggle_anxiety_slider, bg="#0b1220", fg="#dbeafe", activebackground="#0b1220", activeforeground="#67e8f9", selectcolor="#162033", font=("Segoe UI", 9))
+        self.anxiety_with_radio.pack(side="left")
+        self.anxiety_slider_frame = ttk.Frame(frame)
+        self.anxiety_slider_frame.grid(row=10, column=0, sticky="ew")
+        self._slider_block(self.anxiety_slider_frame, self.t("anxiety"), self.t("anxiety_help"), self.anxiety_factor_var, row=0, minimum=1, maximum=2, formatter=lambda value: f"{float(value):.1f}x", step=0.1)
+        self._toggle_anxiety_slider()
 
-        self.base_chart = tk.Frame(frame, bg="#111827", height=180)
-        self.base_chart.grid(row=10, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
-
-        frame.rowconfigure(10, weight=1)
-
-    def _build_stress_tab(self):
-        frame = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(frame, text=self.t("stress"))
-
-        self.stress_n_var = tk.DoubleVar(value=50)
-        self.stress_half_var = tk.DoubleVar(value=7)
-        self.stress_factor_var = tk.DoubleVar(value=1.2)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(2, weight=1)
-        ttk.Label(frame, text=self.t("session_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
-        self.stress_session_label = ttk.Label(frame, text="", style="Value.TLabel")
-        self.stress_session_label.grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 10))
-        self._update_session_labels()
-
-        self._slider_block(
-            frame,
-            self.t("tests"), self.t("tests_help"),
-            self.stress_n_var,
-            row=2,
-            minimum=5,
-            maximum=200,
-            formatter=lambda value: f"{float(value):.0f}",
-        )
-
-        self._slider_block(
-            frame,
-            self.t("half"), self.t("half_help"),
-            self.stress_half_var,
-            row=5,
-            minimum=1,
-            maximum=30,
-            formatter=lambda value: f"{float(value):.0f} giorni",
-        )
-
-        self._slider_block(
-            frame,
-            self.t("anxiety"), self.t("anxiety_help"),
-            self.stress_factor_var,
-            row=8,
-            minimum=1,
-            maximum=2,
-            formatter=lambda value: f"{float(value):.1f}x",
-            step=0.1,
-        )
-
-        ttk.Button(frame, text=self.t("calculate_stress"), command=self._run_stress_analysis).grid(row=12, column=0, sticky="w", pady=(14, 8))
-        self._result_panel(frame, 13, "stress")
-
-        self.stress_chart = tk.Frame(frame, bg="#111827", height=180)
-        self.stress_chart.grid(row=13, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
-
-        frame.rowconfigure(13, weight=1)
+        ttk.Button(frame, text=self.t("calculate"), command=self._run_unified_analysis).grid(row=14, column=0, sticky="w", pady=(14, 8))
+        frame.rowconfigure(14, weight=1)
 
     def _update_session_labels(self):
         if hasattr(self, "base_session_label") and self.base_session_label.winfo_exists():
             self.base_session_label.configure(text=f"{len(self.records)} {self.t('session_count')}")
-        if hasattr(self, "stress_session_label") and self.stress_session_label.winfo_exists():
-            self.stress_session_label.configure(text=f"{len(self.records)} {self.t('session_count')}")
+
+    def _toggle_anxiety_slider(self):
+        if not hasattr(self, "anxiety_slider_frame"):
+            return
+        state = "normal" if self.analysis_mode_var.get() == "stress" else "disabled"
+        for widget in self.anxiety_slider_frame.winfo_children():
+            if isinstance(widget, (tk.Scale, ttk.Scale)):
+                widget.configure(state=state)
 
     def _format_result(self, result):
         if isinstance(result, dict):
@@ -580,30 +533,47 @@ class PatentApp(tk.Tk):
         except Exception:
             ttk.Label(container, text=self.t("no_chart"), foreground="#fca5a5").pack(padx=12, pady=12)
 
-    def _run_base_analysis(self):
+    def _open_analysis_popup(self, records, emivita_giorni, anxiety_enabled, anxiety_factor=1.2):
+        try:
+            if anxiety_enabled:
+                result = analizza_predizione_records_con_stress(records, emivita_giorni, anxiety_factor)
+                mode = "popup_stress"
+            else:
+                result = analizza_predizione_records(records, emivita_giorni=emivita_giorni)
+                mode = "popup_base"
+            popup = tk.Toplevel(self)
+            popup.title(self.t("base"))
+            popup.configure(bg="#0b1220")
+            popup.transient(self)
+            popup.resizable(False, False)
+            popup_frame = ttk.Frame(popup, padding=14)
+            popup_frame.pack(fill="both", expand=True)
+            self._result_panel(popup_frame, 0, "popup")
+            chart = tk.Frame(popup_frame, bg="#111827", height=210)
+            chart.grid(row=1, column=0, sticky="nsew", pady=(4, 8))
+            self._display_result(result, mode)
+            self._show_records_chart(chart, records)
+            ttk.Button(popup_frame, text=self.t("close"), command=popup.destroy).grid(row=2, column=0, sticky="e")
+            popup.update_idletasks()
+            width, height = popup.winfo_reqwidth(), popup.winfo_reqheight()
+            left = self.winfo_rootx() + (self.winfo_width() - width) // 2
+            top = self.winfo_rooty() + (self.winfo_height() - height) // 2
+            popup.geometry(f"{width}x{height}+{max(0, left)}+{max(0, top)}")
+            popup.grab_set()
+        except Exception as exc:
+            messagebox.showerror("Errore", str(exc))
+            return None
+
+    def _run_unified_analysis(self):
         try:
             n_test = int(self.n_test_var.get() or 50)
             emivita = float(self.half_life_var.get() or 7.0)
-            result = analizza_predizione_records(self._selected_records(n_test), emivita_giorni=emivita)
-            self._display_result(result, "base")
-            self._show_records_chart(self.base_chart, self._selected_records(n_test))
+            records = self._selected_records(n_test)
+            if not records:
+                raise ValueError(self.t("no_entries"))
+            self._open_analysis_popup(records, emivita, self.analysis_mode_var.get() == "stress", float(self.anxiety_factor_var.get()))
         except Exception as exc:
             messagebox.showerror("Errore", str(exc))
-            self._display_result(f"Errore: {exc}", "base")
-            self._clear_chart(self.base_chart)
-
-    def _run_stress_analysis(self):
-        try:
-            n_test = int(self.stress_n_var.get() or 50)
-            emivita = float(self.stress_half_var.get() or 7.0)
-            ansia = float(self.stress_factor_var.get() or 1.2)
-            result = analizza_predizione_records_con_stress(self._selected_records(n_test), emivita, ansia)
-            self._display_result(result, "stress")
-            self._show_records_chart(self.stress_chart, self._selected_records(n_test))
-        except Exception as exc:
-            messagebox.showerror("Errore", str(exc))
-            self._display_result(f"Errore: {exc}", "stress")
-            self._clear_chart(self.stress_chart)
 
 
 if __name__ == "__main__":
