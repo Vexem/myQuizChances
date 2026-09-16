@@ -173,8 +173,16 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app._open_date_picker()
         self.app.update_idletasks()
         self.assertTrue(self.app.date_picker.winfo_exists())
+        self.assertLess(abs(self.app.date_picker.winfo_rootx() + self.app.date_picker.winfo_width() / 2 - (self.app.winfo_rootx() + self.app.winfo_width() / 2)), 2)
+        self.assertLess(abs(self.app.date_picker.winfo_rooty() + self.app.date_picker.winfo_height() / 2 - (self.app.winfo_rooty() + self.app.winfo_height() / 2)), 2)
         self.app._select_calendar_date(date(2026, 9, 20))
         self.assertEqual(self.app.entry_date_var.get(), '2026-09-20')
+
+    def test_gui_uses_correct_result_wording(self):
+        records = [{"data": "2026-09-16", "errori": 1}]
+        self.app.records.extend(records)
+        self.app._run_entry_analysis()
+        self.assertEqual(self.app.entry_result_title.cget('text'), 'Probabilità stimata di superamento')
 
 
 if __name__ == '__main__':

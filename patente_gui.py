@@ -168,6 +168,9 @@ class PatentApp(tk.Tk):
         style.configure("Value.TLabel", background="#0f172a", foreground="#67e8f9", font=("Segoe UI", 12, "bold"))
         style.configure("Scale.TLabel", background="#0b1220", foreground="#64748b", font=("Segoe UI", 8))
         style.configure("Horizontal.TScale", troughcolor="#263653", background="#38bdf8", lightcolor="#38bdf8", darkcolor="#38bdf8", borderwidth=0)
+        style.configure("Treeview", background="#111c31", foreground="#dbeafe", fieldbackground="#111c31", rowheight=27, borderwidth=0, font=("Segoe UI", 9))
+        style.configure("Treeview.Heading", background="#1e293b", foreground="#e2e8f0", relief="flat", font=("Segoe UI", 9, "bold"))
+        style.map("Treeview", background=[("selected", "#38bdf8")], foreground=[("selected", "#07111f")])
 
     def _field_block(self, parent, label_text, help_text, variable, row, width=60, button=None):
         ttk.Label(parent, text=label_text, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", pady=(12, 4))
@@ -213,8 +216,9 @@ class PatentApp(tk.Tk):
         parent.columnconfigure(0, weight=1)
 
     def _result_panel(self, parent, row, prefix):
-        panel = tk.Frame(parent, bg="#111c31", highlightbackground="#263653", highlightthickness=1)
+        panel = tk.Frame(parent, height=135, bg="#111c31", highlightbackground="#263653", highlightthickness=1)
         panel.grid(row=row, column=0, columnspan=2, sticky="nsew", pady=(12, 8))
+        panel.grid_propagate(False)
         setattr(self, f"{prefix}_result_title", tk.Label(panel, text=self.t("waiting"), bg="#111c31", fg="#94a3b8", font=("Segoe UI", 10, "bold")))
         getattr(self, f"{prefix}_result_title").pack(anchor="w", padx=18, pady=(14, 0))
         setattr(self, f"{prefix}_result_probability", tk.Label(panel, text="--", bg="#111c31", fg="#67e8f9", font=("Segoe UI", 30, "bold")))
@@ -234,7 +238,7 @@ class PatentApp(tk.Tk):
             return
         if mode in ("base", "entry"):
             probability = result["prob_predittiva"]
-            title = "Probabilità stimata di promozione" if self.language == "it" else "Estimated passing probability"
+            title = "Probabilità stimata di superamento" if self.language == "it" else "Estimated passing probability"
             details = (f"{result['test_superati']} test su {result['test_analizzati']} entro la soglia di 3 errori\n"
                        f"Errori attesi: {result['lambda_atteso']:.2f}  |  Storico positivo: {result['perc_storica']:.1f}%\n"
                        f"{self.t('updated')} {result['data_riferimento']}  |  Emivita: {result['emivita']:.0f} giorni") if self.language == "it" else (f"{result['test_superati']} of {result['test_analizzati']} tests within the 3-error threshold\n"
@@ -334,6 +338,20 @@ class PatentApp(tk.Tk):
         self.calendar_grid.pack(padx=10, pady=(0, 6))
         ttk.Button(self.date_picker, text=self.t("today"), command=lambda: self._select_calendar_date(date.today())).pack(pady=(0, 10))
         self._render_calendar()
+        self.date_picker.update_idletasks()
+        popup_width = self.date_picker.winfo_reqwidth()
+        popup_height = self.date_picker.winfo_reqheight()
+        left = self.winfo_rootx() + (self.winfo_width() - popup_width) // 2
+        top = self.winfo_rooty() + (self.winfo_height() - popup_height) // 2
+        self.date_picker.geometry(f"{popup_width}x{popup_height}+{max(0, left)}+{max(0, top)}")
+        self.date_picker.update_idletasks()
+        target_center_x = self.winfo_rootx() + self.winfo_width() / 2
+        target_center_y = self.winfo_rooty() + self.winfo_height() / 2
+        popup_center_x = self.date_picker.winfo_rootx() + self.date_picker.winfo_width() / 2
+        popup_center_y = self.date_picker.winfo_rooty() + self.date_picker.winfo_height() / 2
+        corrected_left = self.date_picker.winfo_x() + round(target_center_x - popup_center_x)
+        corrected_top = self.date_picker.winfo_y() + round(target_center_y - popup_center_y)
+        self.date_picker.geometry(f"+{max(0, corrected_left)}+{max(0, corrected_top)}")
 
     def _change_calendar_month(self, offset):
         month_index = self.calendar_year * 12 + self.calendar_month - 1 + offset
