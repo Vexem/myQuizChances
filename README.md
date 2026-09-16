@@ -69,9 +69,9 @@ In alternativa, senza attivare l'ambiente:
 L'applicazione si apre con due schede:
 
 - **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
-- **Analisi**: stima standard oppure scenario con ansia, scelto tramite radio button.
+- **Importazioni** / **Settings**: configura numero di test, emivita e valutazione ansia.
 
-La scheda Analisi non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati. Il risultato e il grafico vengono mostrati in un popup dedicato, senza alterare il layout principale.
+La scheda Importazioni/Settings serve solo a cambiare le impostazioni. Non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
 
 ## Inserimento senza file
 
@@ -83,10 +83,12 @@ La scheda **Inserisci risultati** e una proposta alternativa al caricamento di E
 4. ripeti per tutti i test della sessione;
 5. premi **Analizza risultati inseriti** per aprire il report in una finestra popup.
 
-Nella scheda **Analisi** puoi scegliere:
+Nella scheda **Importazioni** / **Settings** puoi scegliere:
 
 - **Senza ansia**: calcolo standard;
-- **Con ansia**: calcolo standard e confronto con il moltiplicatore di ansia scelto.
+- **Con ansia**: calcolo standard e confronto con il moltiplicatore di ansia scelto. Quando e deselezionato, il cursore e le relative indicazioni diventano grigi e non interagibili.
+
+Il pulsante **Analizza risultati inseriti** resta nella scheda Inserisci risultati e apre il report in un popup dedicato.
 
 La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo non accetta testo libero, così il formato resta sempre coerente (`YYYY-MM-DD`).
 
@@ -131,7 +133,7 @@ Indica dopo quanti giorni il peso statistico di un test si dimezza:
 
 #### Moltiplicatore ansia
 
-Disponibile nella scheda **Con ansia**:
+Disponibile nella scheda **Importazioni** / **Settings** quando viene selezionato **Con ansia**:
 
 - `1.0`: condizioni normali;
 - `1.2`: stress moderato;

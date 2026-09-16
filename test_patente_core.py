@@ -164,7 +164,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.update_idletasks()
         self.assertEqual(self.app.language, 'en')
         self.assertEqual(self.app.notebook.tab(0, 'text'), 'Enter results')
-        self.assertEqual(self.app.notebook.tab(1, 'text'), 'Analysis')
+        self.assertEqual(self.app.notebook.tab(1, 'text'), 'Settings')
 
     def test_gui_date_picker_selects_date(self):
         from datetime import date
@@ -183,7 +183,25 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app._open_entry_analysis()
         self.app.update_idletasks()
         self.assertEqual(self.app.popup_result_title.cget('text'), 'Probabilità stimata di superamento')
+        self.assertEqual(self.app.notebook.index('end'), 2)
         self.app.popup_result_title.winfo_toplevel().destroy()
+
+    def test_anxiety_mode_opens_comparison_popup(self):
+        self.app.records.append({"data": "2026-09-16", "errori": 1})
+        self.app.analysis_mode_var.set('stress')
+        self.app._toggle_anxiety_slider()
+        self.app._run_unified_analysis()
+        self.app.update_idletasks()
+        self.assertEqual(self.app.popup_result_title.cget('text'), 'Probabilità stimata in condizioni di ansia')
+        self.app.popup_result_title.winfo_toplevel().destroy()
+
+    def test_settings_disables_anxiety_controls_by_default(self):
+        anxiety_scales = [widget for widget in self.app.anxiety_slider_frame.winfo_children() if isinstance(widget, tk.Scale)]
+        self.assertEqual(len(anxiety_scales), 1)
+        self.assertEqual(anxiety_scales[0].cget('state'), 'disabled')
+        self.app.analysis_mode_var.set('stress')
+        self.app._toggle_anxiety_slider()
+        self.assertEqual(anxiety_scales[0].cget('state'), 'normal')
 
 
 if __name__ == '__main__':

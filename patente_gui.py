@@ -30,7 +30,7 @@ class PatentApp(tk.Tk):
         self.language = "it"
         self.translations = {
             "it": {
-                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "base": "Analisi", "stress": "Con ansia", "english": "English",
+                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "settings": "Importazioni", "stress": "Con ansia", "english": "English",
                 "tests": "Numero di test da considerare", "tests_help": "Più alto è il numero, più lo storico è ampio. Il valore indica quanti test recenti includere.",
                 "half": "Emivita in giorni", "half_help": "Indica dopo quanti giorni un test vecchio perde metà della sua rilevanza. Valori bassi privilegiano i test recenti.",
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
@@ -40,10 +40,10 @@ class PatentApp(tk.Tk):
                 "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "saved_results": "Risultati inseriti", "no_entries": "Inserisci almeno un risultato.",
                 "today": "Oggi", "previous_month": "Mese precedente", "next_month": "Mese successivo", "calendar": "Apri calendario",
                 "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
-                "analysis_mode": "Valutazione ansia", "without_anxiety": "Senza ansia", "with_anxiety": "Con ansia", "close": "Chiudi",
+                "analysis_mode": "Valutazione ansia", "without_anxiety": "Senza ansia", "with_anxiety": "Con ansia", "close": "Chiudi", "report": "Report analisi",
             },
             "en": {
-                "title": "Driving test probability analysis", "entry": "Enter results", "base": "Analysis", "stress": "With anxiety", "english": "Italiano",
+                "title": "Driving test probability analysis", "entry": "Enter results", "settings": "Settings", "stress": "With anxiety", "english": "Italiano",
                 "tests": "Number of tests to include", "tests_help": "A higher number gives a broader history. This is the number of recent tests included.",
                 "half": "Half-life in days", "half_help": "After this many days, an old test has half its relevance. Lower values favor recent tests.",
                 "anxiety": "Anxiety multiplier", "anxiety_help": "1.0 means normal conditions; higher values simulate performance loss under stress.",
@@ -53,7 +53,7 @@ class PatentApp(tk.Tk):
                 "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "saved_results": "Entered results", "no_entries": "Add at least one result.",
                 "today": "Today", "previous_month": "Previous month", "next_month": "Next month", "calendar": "Open calendar",
                 "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
-                "analysis_mode": "Anxiety evaluation", "without_anxiety": "Without anxiety", "with_anxiety": "With anxiety", "close": "Close",
+                "analysis_mode": "Anxiety evaluation", "without_anxiety": "Without anxiety", "with_anxiety": "With anxiety", "close": "Close", "report": "Analysis report",
             },
         }
         self._apply_theme()
@@ -410,14 +410,11 @@ class PatentApp(tk.Tk):
         self._refresh_record_list()
 
     def _open_entry_analysis(self):
-        if not self.records:
-            messagebox.showerror("Errore", self.t("no_entries"))
-            return
-        self._open_analysis_popup(self.records, emivita_giorni=7, anxiety_enabled=False)
+        self._run_unified_analysis()
 
     def _build_base_tab(self):
         frame = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(frame, text=self.t("base"))
+        self.notebook.add(frame, text=self.t("settings"))
 
         self.n_test_var = tk.DoubleVar(value=50)
         self.half_life_var = tk.DoubleVar(value=7)
@@ -462,8 +459,6 @@ class PatentApp(tk.Tk):
         self._slider_block(self.anxiety_slider_frame, self.t("anxiety"), self.t("anxiety_help"), self.anxiety_factor_var, row=0, minimum=1, maximum=2, formatter=lambda value: f"{float(value):.1f}x", step=0.1)
         self._toggle_anxiety_slider()
 
-        ttk.Button(frame, text=self.t("calculate"), command=self._run_unified_analysis).grid(row=14, column=0, sticky="w", pady=(14, 8))
-        frame.rowconfigure(14, weight=1)
 
     def _update_session_labels(self):
         if hasattr(self, "base_session_label") and self.base_session_label.winfo_exists():
@@ -473,9 +468,13 @@ class PatentApp(tk.Tk):
         if not hasattr(self, "anxiety_slider_frame"):
             return
         state = "normal" if self.analysis_mode_var.get() == "stress" else "disabled"
+        foreground = "#dbeafe" if state == "normal" else "#475569"
+        value_foreground = "#67e8f9" if state == "normal" else "#475569"
         for widget in self.anxiety_slider_frame.winfo_children():
             if isinstance(widget, (tk.Scale, ttk.Scale)):
                 widget.configure(state=state)
+            elif isinstance(widget, ttk.Label):
+                widget.configure(foreground=value_foreground if widget.cget("style") == "Value.TLabel" else foreground)
 
     def _format_result(self, result):
         if isinstance(result, dict):
@@ -542,7 +541,7 @@ class PatentApp(tk.Tk):
                 result = analizza_predizione_records(records, emivita_giorni=emivita_giorni)
                 mode = "popup_base"
             popup = tk.Toplevel(self)
-            popup.title(self.t("base"))
+            popup.title(self.t("report"))
             popup.configure(bg="#0b1220")
             popup.transient(self)
             popup.resizable(False, False)
