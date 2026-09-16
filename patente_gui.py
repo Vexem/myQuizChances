@@ -298,8 +298,10 @@ class PatentApp(tk.Tk):
         details_widget.configure(text=details)
 
     def _build_entry_tab(self):
-        frame = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(frame, text=self.t("entry"))
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text=self.t("entry"))
+        frame = ttk.Frame(tab, padding=16)
+        frame.place(relx=0.5, rely=0.02, relwidth=0.78, anchor="n")
         frame.columnconfigure(0, weight=1)
 
         self.entry_date_var = tk.StringVar(value=date.today().isoformat())
@@ -462,8 +464,10 @@ class PatentApp(tk.Tk):
         self._run_unified_analysis()
 
     def _build_base_tab(self):
-        frame = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(frame, text=self.t("settings"))
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text=self.t("settings"))
+        frame = ttk.Frame(tab, padding=16)
+        frame.place(relx=0.5, rely=0.02, relwidth=0.78, anchor="n")
 
         self.n_test_var = tk.DoubleVar(value=self.saved_settings["test_count"])
         self.half_life_var = tk.DoubleVar(value=self.saved_settings["half_life"])
