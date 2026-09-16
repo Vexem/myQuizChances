@@ -270,12 +270,18 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertEqual(load_records(self.storage_path), [])
 
     def test_record_list_scrolls_after_fifteen_entries(self):
+        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": day % 7} for day in range(1, 11)]
+        self.app._refresh_record_list()
+        self.app.update_idletasks()
+        self.assertFalse(self.app.records_scrollbar.winfo_ismapped())
+
         self.app.records = [{"data": f"2026-09-{day:02d}", "errori": day % 7} for day in range(1, 17)]
         self.app._refresh_record_list()
         self.app.update_idletasks()
         bounds = self.app.records_canvas.bbox("all")
         self.assertIsNotNone(bounds)
         self.assertGreater(bounds[3] - bounds[1], self.app.records_canvas.winfo_height())
+        self.assertTrue(self.app.records_scrollbar.winfo_ismapped())
         visible_text = [child.cget("text") for child in self.app.records_list_frame.winfo_children()[0].winfo_children()]
         self.assertNotIn("Rimuovi selezionato", visible_text)
 

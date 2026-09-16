@@ -215,6 +215,8 @@ class PatentApp(tk.Tk):
         style.configure("Treeview", background="#111c31", foreground="#dbeafe", fieldbackground="#111c31", rowheight=27, borderwidth=0, font=("Segoe UI", 9))
         style.configure("Treeview.Heading", background="#1e293b", foreground="#e2e8f0", relief="flat", font=("Segoe UI", 9, "bold"))
         style.map("Treeview", background=[("selected", "#38bdf8")], foreground=[("selected", "#07111f")])
+        style.configure("Dark.Vertical.TScrollbar", troughcolor="#0b1220", background="#263653", bordercolor="#0b1220", arrowcolor="#67e8f9", relief="flat", width=12)
+        style.map("Dark.Vertical.TScrollbar", background=[("active", "#38bdf8")])
 
     def _slider_block(self, parent, label_text, help_text, variable, row, minimum, maximum, formatter=str, step=1):
         ttk.Label(parent, text=label_text, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", pady=(12, 4))
@@ -309,26 +311,25 @@ class PatentApp(tk.Tk):
 
         ttk.Label(frame, text=self.t("entry_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
         ttk.Label(frame, text=self.t("entry_date"), font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 4))
-        ttk.Label(frame, text="YYYY-MM-DD", style="Info.TLabel").grid(row=2, column=0, sticky="w", pady=(0, 8))
         date_controls = ttk.Frame(frame)
-        date_controls.grid(row=3, column=0, sticky="w")
+        date_controls.grid(row=2, column=0, sticky="w", pady=(0, 8))
         self.entry_date_display = ttk.Entry(date_controls, textvariable=self.entry_date_var, state="readonly", width=18)
         self.entry_date_display.pack(side="left", padx=(0, 8))
         self.calendar_button = ttk.Button(date_controls, text="📅", width=3, command=self._open_date_picker)
         self.calendar_button.pack(side="left")
-        self._slider_block(frame, self.t("entry_errors"), "0 = nessun errore; 12 = molti errori.", self.entry_errors_var, row=4, minimum=0, maximum=12, formatter=lambda value: f"{float(value):.0f}")
+        self._slider_block(frame, self.t("entry_errors"), "0 = nessun errore; 12 = molti errori.", self.entry_errors_var, row=3, minimum=0, maximum=12, formatter=lambda value: f"{float(value):.0f}")
 
         actions = ttk.Frame(frame)
-        actions.grid(row=8, column=0, sticky="w", pady=(14, 8))
+        actions.grid(row=7, column=0, sticky="w", pady=(14, 8))
         ttk.Button(actions, text=self.t("add"), command=self._add_record).pack(side="left", padx=(0, 8))
         ttk.Button(actions, text=self.t("clear"), command=self._clear_records).pack(side="left")
 
         list_container = ttk.Frame(frame)
-        list_container.grid(row=9, column=0, sticky="ew", pady=(0, 10))
+        list_container.grid(row=8, column=0, sticky="ew", pady=(0, 10))
         list_container.columnconfigure(0, weight=1)
-        self.records_canvas = tk.Canvas(list_container, bg="#0b1220", highlightthickness=0, height=240)
+        self.records_canvas = tk.Canvas(list_container, bg="#0b1220", highlightthickness=0, height=300)
         self.records_canvas.grid(row=0, column=0, sticky="ew")
-        self.records_scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.records_canvas.yview)
+        self.records_scrollbar = ttk.Scrollbar(list_container, orient="vertical", style="Dark.Vertical.TScrollbar", command=self.records_canvas.yview)
         self.records_scrollbar.grid(row=0, column=1, sticky="ns")
         self.records_canvas.configure(yscrollcommand=self.records_scrollbar.set)
         self.records_list_frame = ttk.Frame(self.records_canvas)
@@ -337,7 +338,7 @@ class PatentApp(tk.Tk):
         self.records_canvas.bind("<Configure>", lambda event: self.records_canvas.itemconfigure(self.records_window, width=event.width))
         self._refresh_record_list()
 
-        ttk.Button(frame, text=self.t("analyze_entries"), command=self._open_entry_analysis).grid(row=10, column=0, sticky="w", pady=(4, 8))
+        ttk.Button(frame, text=self.t("analyze_entries"), command=self._open_entry_analysis).grid(row=9, column=0, sticky="w", pady=(4, 8))
 
     def _refresh_record_list(self):
         if not hasattr(self, "records_list_frame"):
@@ -356,6 +357,10 @@ class PatentApp(tk.Tk):
             tk.Label(row, text=str(int(record["errori"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
             tk.Button(row, text="×", command=lambda item=record: self._remove_record(item), bg="#ef4444", fg="#ffffff", activebackground="#f87171", activeforeground="#ffffff", relief="flat", bd=0, width=3, font=("Segoe UI", 10, "bold"), cursor="hand2").pack(side="right", padx=6)
         self.records_canvas.configure(scrollregion=self.records_canvas.bbox("all"))
+        if len(self.records) > 10:
+            self.records_scrollbar.grid()
+        else:
+            self.records_scrollbar.grid_remove()
         self._update_session_labels()
 
     def _open_date_picker(self):
