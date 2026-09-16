@@ -15,7 +15,7 @@ from patente_core import (
     distribuzione_errori,
     distribuzione_errori_records,
 )
-from patente_storage import StorageError, load_records, save_records
+from patente_storage import StorageError, load_records, load_settings, save_records, save_settings
 
 
 class PatentCoreTestCase(unittest.TestCase):
@@ -160,6 +160,16 @@ class PatentCoreTestCase(unittest.TestCase):
             with self.assertRaises(StorageError):
                 load_records(path)
 
+    def test_settings_round_trip_and_defaults(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            defaults = load_settings(path)
+            save_settings({"test_count": 80, "half_life": 14, "anxiety_mode": "stress", "anxiety_factor": 1.5}, path)
+            loaded = load_settings(path)
+        self.assertEqual(defaults["test_count"], 50)
+        self.assertEqual(loaded["test_count"], 80)
+        self.assertEqual(loaded["anxiety_mode"], "stress")
+
 
 class PatentGuiTestCase(unittest.TestCase):
     def setUp(self):
@@ -167,7 +177,8 @@ class PatentGuiTestCase(unittest.TestCase):
             from patente_gui import PatentApp
             self.storage_directory = tempfile.TemporaryDirectory()
             self.storage_path = Path(self.storage_directory.name) / "records.json"
-            self.app = PatentApp(storage_path=self.storage_path)
+            self.settings_path = Path(self.storage_directory.name) / "settings.json"
+            self.app = PatentApp(storage_path=self.storage_path, settings_path=self.settings_path)
         except tk.TclError as error:
             self.skipTest(f'GUI non disponibile in questo ambiente: {error}')
 
@@ -241,14 +252,14 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app._add_record()
         self.assertEqual(load_records(self.storage_path), [{"data": "2026-09-16", "errori": 2}])
 
-        self.app.entry_tree.selection_set(self.app.entry_tree.get_children()[0])
-        self.app._remove_record()
+        delete_button = next(child for child in self.app.records_list_frame.winfo_children()[1].winfo_children() if isinstance(child, tk.Button))
+        delete_button.invoke()
         self.assertEqual(load_records(self.storage_path), [])
 
     def test_gui_reloads_saved_records(self):
         save_records([{"data": "2026-09-15", "errori": 1}], self.storage_path)
         self.app.destroy()
-        self.app = __import__('patente_gui', fromlist=['PatentApp']).PatentApp(storage_path=self.storage_path)
+        self.app = __import__('patente_gui', fromlist=['PatentApp']).PatentApp(storage_path=self.storage_path, settings_path=self.settings_path)
         self.app.update_idletasks()
         self.assertEqual(self.app.records, [{"data": "2026-09-15", "errori": 1}])
 
@@ -257,6 +268,20 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app._persist_records()
         self.app._clear_records()
         self.assertEqual(load_records(self.storage_path), [])
+
+    def test_gui_persists_settings_for_next_start(self):
+        self.app.n_test_var.set(80)
+        self.app.half_life_var.set(14)
+        self.app.analysis_mode_var.set('stress')
+        self.app._toggle_anxiety_slider()
+        self.app.anxiety_factor_var.set(1.5)
+        self.app.destroy()
+        self.app = __import__('patente_gui', fromlist=['PatentApp']).PatentApp(storage_path=self.storage_path, settings_path=self.settings_path)
+        self.app.update_idletasks()
+        self.assertEqual(int(self.app.n_test_var.get()), 80)
+        self.assertEqual(float(self.app.half_life_var.get()), 14)
+        self.assertEqual(self.app.analysis_mode_var.get(), 'stress')
+        self.assertAlmostEqual(float(self.app.anxiety_factor_var.get()), 1.5)
 
 
 if __name__ == '__main__':

@@ -21,6 +21,8 @@ Applicazione desktop per stimare la probabilita di superare l'esame di teoria de
 - Salvataggio automatico locale dopo ogni modifica.
 - Ripristino automatico dei risultati all'avvio.
 - Cancellazione manuale di una singola entry o dell'intero elenco.
+- Pulsante `x` rosso accanto a ogni entry per la cancellazione diretta.
+- Impostazioni ripristinate automaticamente all'avvio successivo.
 
 ## Requisiti
 
@@ -72,9 +74,9 @@ In alternativa, senza attivare l'ambiente:
 L'applicazione si apre con due schede:
 
 - **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
-- **Importazioni** / **Settings**: configura numero di test, emivita e valutazione ansia.
+- **Impostazioni** / **Settings**: configura numero di test, emivita e valutazione ansia.
 
-La scheda Importazioni/Settings serve solo a cambiare le impostazioni. Non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
+La scheda Impostazioni/Settings serve solo a cambiare le impostazioni. Non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
 
 ## Inserimento senza file
 
@@ -86,7 +88,7 @@ La scheda **Inserisci risultati** e una proposta alternativa al caricamento di E
 4. ripeti per tutti i test della sessione;
 5. premi **Analizza risultati inseriti** per aprire il report in una finestra popup.
 
-Nella scheda **Importazioni** / **Settings** puoi scegliere:
+Nella scheda **Impostazioni** / **Settings** puoi scegliere:
 
 - **Senza ansia**: calcolo standard;
 - **Con ansia**: calcolo standard e confronto con il moltiplicatore di ansia scelto. Quando e deselezionato, il cursore e le relative indicazioni diventano grigi e non interagibili.
@@ -113,7 +115,15 @@ I record non vengono persi chiudendo l'applicazione. Dopo ogni aggiunta, cancell
 
 Il salvataggio usa un file temporaneo e una sostituzione atomica, per evitare di lasciare un archivio parzialmente scritto in caso di interruzione. All'avvio il file viene ricaricato automaticamente. Se il contenuto non e leggibile, l'app mostra un errore e non sovrascrive il file danneggiato.
 
-La cancellazione e sempre esplicita: **Rimuovi selezionato** elimina una sola entry, mentre **Svuota elenco** elimina tutti i risultati salvati.
+La cancellazione e sempre esplicita: la `x` rossa accanto a una entry elimina solo quella entry, mentre **Svuota elenco** elimina tutti i risultati salvati.
+
+Anche i parametri della scheda **Impostazioni** / **Settings** vengono salvati automaticamente in:
+
+```text
+%LOCALAPPDATA%\AnalisiPatente\settings.json
+```
+
+Sono persistiti il numero di test, l'emivita, la modalita ansia e il relativo moltiplicatore. Non serve un pulsante Salva.
 
 ## Utilizzo della GUI
 
@@ -148,7 +158,7 @@ Indica dopo quanti giorni il peso statistico di un test si dimezza:
 
 #### Moltiplicatore ansia
 
-Disponibile nella scheda **Importazioni** / **Settings** quando viene selezionato **Con ansia**:
+Disponibile nella scheda **Impostazioni** / **Settings** quando viene selezionato **Con ansia**:
 
 - `1.0`: condizioni normali;
 - `1.2`: stress moderato;

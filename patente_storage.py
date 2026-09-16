@@ -10,7 +10,7 @@ class StorageError(Exception):
     """Raised when saved application data cannot be read or written."""
 
 
-def get_storage_path(app_name="AnalisiPatente", base_dir=None):
+def get_storage_path(app_name="AnalisiPatente", base_dir=None, file_name="records.json"):
     """Return the platform data path used by the application."""
     if base_dir is not None:
         root = Path(base_dir)
@@ -18,7 +18,7 @@ def get_storage_path(app_name="AnalisiPatente", base_dir=None):
         root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     else:
         root = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    return root / app_name / "records.json"
+    return root / app_name / file_name
 
 
 def _validate_records(records):
@@ -63,3 +63,56 @@ def save_records(records, path):
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
         raise StorageError(f"Unable to save records: {error}") from error
+
+
+def load_settings(path):
+    """Load validated application settings or return defaults."""
+    defaults = {
+        "test_count": 50,
+        "half_life": 7.0,
+        "anxiety_mode": "base",
+        "anxiety_factor": 1.2,
+    }
+    settings_path = Path(path)
+    if not settings_path.exists():
+        return defaults
+    try:
+        with settings_path.open("r", encoding="utf-8") as stream:
+            saved = json.load(stream)
+        if not isinstance(saved, dict):
+            raise StorageError("Saved settings must be an object.")
+        settings = defaults | saved
+        settings["test_count"] = int(settings["test_count"])
+        settings["half_life"] = float(settings["half_life"])
+        settings["anxiety_factor"] = float(settings["anxiety_factor"])
+        if settings["anxiety_mode"] not in {"base", "stress"}:
+            raise StorageError("Saved anxiety mode is invalid.")
+        if settings["test_count"] < 1 or settings["half_life"] <= 0 or settings["anxiety_factor"] < 1:
+            raise StorageError("Saved settings contain invalid values.")
+        return settings
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        raise StorageError(f"Unable to read saved settings: {error}") from error
+
+
+def save_settings(settings, path):
+    """Atomically persist application settings."""
+    settings_path = Path(path)
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "test_count": int(settings["test_count"]),
+        "half_life": float(settings["half_life"]),
+        "anxiety_mode": str(settings["anxiety_mode"]),
+        "anxiety_factor": float(settings["anxiety_factor"]),
+    }
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=settings_path.parent, delete=False) as stream:
+            temporary_path = Path(stream.name)
+            json.dump(payload, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, settings_path)
+    except OSError as error:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise StorageError(f"Unable to save settings: {error}") from error

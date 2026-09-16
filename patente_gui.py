@@ -14,30 +14,37 @@ from patente_core import (
     analizza_predizione_records_con_stress,
     distribuzione_errori_records,
 )
-from patente_storage import StorageError, get_storage_path, load_records, save_records
+from patente_storage import StorageError, get_storage_path, load_records, load_settings, save_records, save_settings
 
 
 class PatentApp(tk.Tk):
-    def __init__(self, storage_path=None):
+    def __init__(self, storage_path=None, settings_path=None):
         super().__init__()
         self.title("Analisi Patente")
-        self.geometry("900x680")
-        self.minsize(850, 620)
+        self.geometry("1100x760")
+        self.minsize(1000, 700)
         self.configure(bg="#0b1220")
         self._center_window()
         self.after(100, self._focus_window)
 
         self.storage_path = Path(storage_path) if storage_path is not None else get_storage_path()
+        self.settings_path = Path(settings_path) if settings_path is not None else get_storage_path(file_name="settings.json")
         self.storage_error = None
         try:
             self.records = load_records(self.storage_path)
         except StorageError as error:
             self.records = []
             self.storage_error = error
+        self.settings_error = None
+        try:
+            self.saved_settings = load_settings(self.settings_path)
+        except StorageError as error:
+            self.saved_settings = load_settings(Path("__missing_settings__.json"))
+            self.settings_error = error
         self.language = "it"
         self.translations = {
             "it": {
-                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "settings": "Importazioni", "english": "English",
+                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "settings": "Impostazioni", "english": "English",
                 "tests": "Numero di test da considerare", "tests_help": "Più alto è il numero, più lo storico è ampio. Il valore indica quanti test recenti includere.",
                 "half": "Emivita in giorni", "half_help": "Indica dopo quanti giorni un test vecchio perde metà della sua rilevanza. Valori bassi privilegiano i test recenti.",
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
@@ -91,7 +98,7 @@ class PatentApp(tk.Tk):
 
         self._build_entry_tab()
         self._build_base_tab()
-        if self.storage_error is not None:
+        if self.storage_error is not None or self.settings_error is not None:
             self.after_idle(self._show_storage_error)
 
     def t(self, key):
@@ -141,7 +148,8 @@ class PatentApp(tk.Tk):
         self._build_base_tab()
 
     def _show_storage_error(self):
-        messagebox.showerror(self.t("storage_error"), str(self.storage_error))
+        error = self.storage_error or self.settings_error
+        messagebox.showerror(self.t("storage_error"), str(error))
 
     def _persist_records(self):
         try:
@@ -151,10 +159,26 @@ class PatentApp(tk.Tk):
             messagebox.showerror(self.t("storage_error"), str(error))
             return False
 
+    def _persist_settings(self):
+        try:
+            save_settings(self._current_settings(), self.settings_path)
+            return True
+        except StorageError as error:
+            messagebox.showerror(self.t("storage_error"), str(error))
+            return False
+
+    def _current_settings(self):
+        return {
+            "test_count": int(self.n_test_var.get()),
+            "half_life": float(self.half_life_var.get()),
+            "anxiety_mode": self.analysis_mode_var.get(),
+            "anxiety_factor": float(self.anxiety_factor_var.get()),
+        }
+
     def _center_window(self):
         self.update_idletasks()
-        width = 900
-        height = 680
+        width = 1100
+        height = 760
         left = max(0, (self.winfo_screenwidth() - width) // 2)
         top = max(0, (self.winfo_screenheight() - height) // 2)
         self.geometry(f"{width}x{height}+{left}+{top}")
@@ -202,6 +226,8 @@ class PatentApp(tk.Tk):
             snapped = round(float(raw_value) / step) * step
             variable.set(snapped)
             value_label.configure(text=formatter(snapped))
+            if hasattr(self, "n_test_var") and hasattr(self, "analysis_mode_var"):
+                self._persist_settings()
 
         slider = tk.Scale(
             parent,
@@ -224,6 +250,7 @@ class PatentApp(tk.Tk):
         slider.grid(row=row + 2, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Label(parent, text=formatter(minimum), style="Scale.TLabel").grid(row=row + 3, column=0, sticky="w")
         ttk.Label(parent, text=formatter(maximum), style="Scale.TLabel").grid(row=row + 3, column=1, sticky="e")
+        variable.trace_add("write", lambda *_: self._persist_settings() if hasattr(self, "n_test_var") and hasattr(self, "analysis_mode_var") else None)
         parent.columnconfigure(0, weight=1)
 
     def _result_panel(self, parent, row, prefix):
@@ -295,23 +322,27 @@ class PatentApp(tk.Tk):
         ttk.Button(actions, text=self.t("remove"), command=self._remove_record).pack(side="left", padx=(0, 8))
         ttk.Button(actions, text=self.t("clear"), command=self._clear_records).pack(side="left")
 
-        self.entry_tree = ttk.Treeview(frame, columns=("date", "errors"), show="headings", height=6)
-        self.entry_tree.heading("date", text=self.t("entry_date"))
-        self.entry_tree.heading("errors", text=self.t("entry_errors"))
-        self.entry_tree.column("date", width=150, anchor="center")
-        self.entry_tree.column("errors", width=150, anchor="center")
-        self.entry_tree.grid(row=9, column=0, sticky="nsew", pady=(0, 10))
+        self.records_list_frame = ttk.Frame(frame)
+        self.records_list_frame.grid(row=9, column=0, sticky="ew", pady=(0, 10))
         self._refresh_record_list()
 
         ttk.Button(frame, text=self.t("analyze_entries"), command=self._open_entry_analysis).grid(row=10, column=0, sticky="w", pady=(4, 8))
 
     def _refresh_record_list(self):
-        if not hasattr(self, "entry_tree"):
+        if not hasattr(self, "records_list_frame"):
             return
-        for item in self.entry_tree.get_children():
-            self.entry_tree.delete(item)
+        for child in self.records_list_frame.winfo_children():
+            child.destroy()
+        header = ttk.Frame(self.records_list_frame)
+        header.pack(fill="x")
+        ttk.Label(header, text=self.t("entry_date"), style="Scale.TLabel", width=24).pack(side="left", padx=(8, 0))
+        ttk.Label(header, text=self.t("entry_errors"), style="Scale.TLabel", width=18).pack(side="left")
         for record in sorted(self.records, key=lambda value: value["data"]):
-            self.entry_tree.insert("", "end", values=(record["data"], int(record["errori"])))
+            row = tk.Frame(self.records_list_frame, bg="#111c31")
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=record["data"], bg="#111c31", fg="#dbeafe", width=24, anchor="w", padx=8, font=("Segoe UI", 9)).pack(side="left")
+            tk.Label(row, text=str(int(record["errori"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
+            tk.Button(row, text="×", command=lambda item=record: self._remove_record(item), bg="#ef4444", fg="#ffffff", activebackground="#f87171", activeforeground="#ffffff", relief="flat", bd=0, width=3, font=("Segoe UI", 10, "bold"), cursor="hand2").pack(side="right", padx=6)
         self._update_session_labels()
 
     def _open_date_picker(self):
@@ -412,12 +443,7 @@ class PatentApp(tk.Tk):
         except ValueError as error:
             messagebox.showerror("Errore", str(error))
 
-    def _remove_record(self):
-        selected = self.entry_tree.selection()
-        if not selected:
-            return
-        values = self.entry_tree.item(selected[0], "values")
-        record = {"data": values[0], "errori": int(values[1])}
+    def _remove_record(self, record):
         self.records.remove(record)
         if not self._persist_records():
             self.records.append(record)
@@ -439,10 +465,10 @@ class PatentApp(tk.Tk):
         frame = ttk.Frame(self.notebook, padding=16)
         self.notebook.add(frame, text=self.t("settings"))
 
-        self.n_test_var = tk.DoubleVar(value=50)
-        self.half_life_var = tk.DoubleVar(value=7)
-        self.anxiety_factor_var = tk.DoubleVar(value=1.2)
-        self.analysis_mode_var = tk.StringVar(value="base")
+        self.n_test_var = tk.DoubleVar(value=self.saved_settings["test_count"])
+        self.half_life_var = tk.DoubleVar(value=self.saved_settings["half_life"])
+        self.anxiety_factor_var = tk.DoubleVar(value=self.saved_settings["anxiety_factor"])
+        self.analysis_mode_var = tk.StringVar(value=self.saved_settings["anxiety_mode"])
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(2, weight=1)
         ttk.Label(frame, text=self.t("session_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
@@ -498,6 +524,8 @@ class PatentApp(tk.Tk):
                 widget.configure(state=state)
             elif isinstance(widget, ttk.Label):
                 widget.configure(foreground=value_foreground if widget.cget("style") == "Value.TLabel" else foreground)
+        if hasattr(self, "n_test_var"):
+            self._persist_settings()
 
     def _clear_chart(self, container):
         for child in container.winfo_children():
