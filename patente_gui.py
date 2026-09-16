@@ -21,8 +21,8 @@ class PatentApp(tk.Tk):
     def __init__(self, storage_path=None, settings_path=None):
         super().__init__()
         self.title("Analisi Patente")
-        self.geometry("1100x760")
-        self.minsize(1000, 700)
+        self.geometry("1100x900")
+        self.minsize(1000, 820)
         self.configure(bg="#0b1220")
         self._center_window()
         self.after(100, self._focus_window)
@@ -137,6 +137,7 @@ class PatentApp(tk.Tk):
         self.language_selector.configure(menu=self.language_menu)
 
     def _switch_language(self, language):
+        selected_tab = self.notebook.index(self.notebook.select())
         self.language = language
         self.header.configure(text=self.t("title"))
         self.notebook.destroy()
@@ -146,6 +147,7 @@ class PatentApp(tk.Tk):
         self._build_language_selector()
         self._build_entry_tab()
         self._build_base_tab()
+        self.notebook.select(selected_tab)
 
     def _show_storage_error(self):
         error = self.storage_error or self.settings_error
@@ -178,7 +180,7 @@ class PatentApp(tk.Tk):
     def _center_window(self):
         self.update_idletasks()
         width = 1100
-        height = 760
+        height = 900
         left = max(0, (self.winfo_screenwidth() - width) // 2)
         top = max(0, (self.winfo_screenheight() - height) // 2)
         self.geometry(f"{width}x{height}+{left}+{top}")
