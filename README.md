@@ -14,7 +14,6 @@ Applicazione desktop per stimare la probabilita di superare l'esame di teoria de
 - Grafico della distribuzione degli errori.
 - Interfaccia in italiano e inglese.
 - Selettore lingua con icone delle bandiere.
-- Scelta del file Excel tramite finestra di dialogo.
 - Test automatici del motore e dei principali componenti GUI.
 - Eseguibile Windows generabile con PyInstaller.
 - Inserimento diretto dei risultati nell'app senza caricare file esterni.
@@ -69,8 +68,10 @@ In alternativa, senza attivare l'ambiente:
 L'applicazione si apre con tre schede:
 
 - **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
-- **Base**: stima standard basata sugli errori registrati.
-- **Con ansia**: confronta lo scenario normale con uno scenario che simula maggiore difficolta.
+- **Base**: stima standard sui risultati presenti nella sessione.
+- **Con ansia**: confronta lo scenario normale con uno scenario di stress usando la stessa sessione.
+
+Le schede Base e Con ansia non permettono di inserire percorsi o caricare file: usano esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
 
 ## Inserimento senza file
 
@@ -92,9 +93,9 @@ Il motore di analisi riceve una lista di questi record tramite `analizza_predizi
 
 ## Utilizzo della GUI
 
-### File Excel
+### Formato Excel compatibile del motore
 
-Il file deve avere una struttura a righe:
+Il caricamento Excel resta disponibile nelle API del motore per compatibilita e test, ma non fa parte del flusso principale della GUI. Il file deve avere una struttura a righe:
 
 | Data | Quiz 1 | Quiz 2 | Quiz 3 |
 |---|---:|---:|---:|
@@ -105,7 +106,7 @@ Il file deve avere una struttura a righe:
 - Le colonne successive contengono il numero di errori.
 - Le celle vuote e i valori non numerici vengono ignorati.
 - Le righe con date non valide vengono ignorate.
-- Il file predefinito incluso nel progetto e `SCHEMA TEST PATENTE.xlsx`.
+- Il dataset di compatibilita incluso nel progetto e `SCHEMA TEST PATENTE.xlsx`.
 
 ### Parametri
 

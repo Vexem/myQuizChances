@@ -2,17 +2,15 @@ import os
 import tkinter as tk
 from datetime import date
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 
 from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from patente_core import (
-    analizza_predizione_patente,
     analizza_predizione_records,
-    analizza_predizione_patente_con_stress,
-    distribuzione_errori,
+    analizza_predizione_records_con_stress,
     distribuzione_errori_records,
 )
 
@@ -27,13 +25,11 @@ class PatentApp(tk.Tk):
         self._center_window()
         self.after(100, self._focus_window)
 
-        self.default_file = Path(__file__).resolve().parent / "SCHEMA TEST PATENTE.xlsx"
         self.records = []
         self.language = "it"
         self.translations = {
             "it": {
                 "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "base": "Base", "stress": "Con ansia", "english": "English",
-                "file": "File Excel da analizzare", "file_help": "Inserisci il file con i risultati dei test. La prima colonna deve contenere la data e le seguenti i punteggi di errore.", "browse": "Sfoglia",
                 "tests": "Numero di test da considerare", "tests_help": "Più alto è il numero, più lo storico è ampio. Il valore indica quanti test recenti includere.",
                 "half": "Emivita in giorni", "half_help": "Indica dopo quanti giorni un test vecchio perde metà della sua rilevanza. Valori bassi privilegiano i test recenti.",
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
@@ -41,10 +37,10 @@ class PatentApp(tk.Tk):
                 "chart": "Distribuzione degli errori negli ultimi test", "errors": "Numero di errori", "occurrences": "Occorrenze", "no_chart": "Nessun grafico disponibile per questo file.",
                 "error": "Analisi non disponibile", "normal": "Scenario tranquillo", "stress_scenario": "Scenario ansia", "updated": "Aggiornato al", "analyzed": "Analizzati",
                 "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "saved_results": "Risultati inseriti", "no_entries": "Inserisci almeno un risultato.",
+                "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
             },
             "en": {
                 "title": "Driving test probability analysis", "entry": "Enter results", "base": "Standard", "stress": "With anxiety", "english": "Italiano",
-                "file": "Excel file to analyze", "file_help": "Choose the file with your test results. The first column must contain dates and the following columns error scores.", "browse": "Browse",
                 "tests": "Number of tests to include", "tests_help": "A higher number gives a broader history. This is the number of recent tests included.",
                 "half": "Half-life in days", "half_help": "After this many days, an old test has half its relevance. Lower values favor recent tests.",
                 "anxiety": "Anxiety multiplier", "anxiety_help": "1.0 means normal conditions; higher values simulate performance loss under stress.",
@@ -52,6 +48,7 @@ class PatentApp(tk.Tk):
                 "chart": "Error distribution in recent tests", "errors": "Number of errors", "occurrences": "Occurrences", "no_chart": "No chart is available for this file.",
                 "error": "Analysis unavailable", "normal": "Calm scenario", "stress_scenario": "Anxiety scenario", "updated": "Updated on", "analyzed": "Analyzed",
                 "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "saved_results": "Entered results", "no_entries": "Add at least one result.",
+                "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
             },
         }
         self._apply_theme()
@@ -294,6 +291,11 @@ class PatentApp(tk.Tk):
             self.entry_tree.delete(item)
         for record in sorted(self.records, key=lambda value: value["data"]):
             self.entry_tree.insert("", "end", values=(record["data"], int(record["errori"])))
+        self._update_session_labels()
+
+    def _selected_records(self, count):
+        records = sorted(self.records, key=lambda value: value["data"])
+        return records[-int(count):]
 
     def _add_record(self):
         try:
@@ -325,7 +327,7 @@ class PatentApp(tk.Tk):
                 raise ValueError(self.t("no_entries"))
             result = analizza_predizione_records(self.records, emivita_giorni=7)
             self._display_result(result, "entry")
-            self._show_records_chart(self.entry_chart)
+            self._show_records_chart(self.entry_chart, self.records)
         except Exception as error:
             messagebox.showerror("Errore", str(error))
             self._display_result(f"Errore: {error}", "entry")
@@ -334,24 +336,20 @@ class PatentApp(tk.Tk):
         frame = ttk.Frame(self.notebook, padding=16)
         self.notebook.add(frame, text=self.t("base"))
 
-        self.path_var = tk.StringVar(value=str(self.default_file))
         self.n_test_var = tk.DoubleVar(value=50)
         self.half_life_var = tk.DoubleVar(value=7)
-
-        self._field_block(
-            frame,
-            self.t("file"), self.t("file_help"),
-            self.path_var,
-            row=0,
-            width=68,
-            button=ttk.Button(frame, text=self.t("browse"), command=self._choose_file),
-        )
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(2, weight=1)
+        ttk.Label(frame, text=self.t("session_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        self.base_session_label = ttk.Label(frame, text="", style="Value.TLabel")
+        self.base_session_label.grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        self._update_session_labels()
 
         self._slider_block(
             frame,
             self.t("tests"), self.t("tests_help"),
             self.n_test_var,
-            row=3,
+            row=2,
             minimum=5,
             maximum=200,
             formatter=lambda value: f"{float(value):.0f}",
@@ -361,45 +359,39 @@ class PatentApp(tk.Tk):
             frame,
             self.t("half"), self.t("half_help"),
             self.half_life_var,
-            row=6,
+            row=5,
             minimum=1,
             maximum=30,
             formatter=lambda value: f"{float(value):.0f} giorni",
         )
 
-        ttk.Button(frame, text=self.t("calculate"), command=self._run_base_analysis).grid(row=10, column=0, sticky="w", pady=(18, 10))
-        self._result_panel(frame, 11, "base")
+        ttk.Button(frame, text=self.t("calculate"), command=self._run_base_analysis).grid(row=9, column=0, sticky="w", pady=(14, 8))
+        self._result_panel(frame, 10, "base")
 
-        self.base_chart = tk.Frame(frame, bg="#111827", height=220)
-        self.base_chart.grid(row=11, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
+        self.base_chart = tk.Frame(frame, bg="#111827", height=180)
+        self.base_chart.grid(row=10, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
 
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(2, weight=1)
-        frame.rowconfigure(11, weight=1)
+        frame.rowconfigure(10, weight=1)
 
     def _build_stress_tab(self):
         frame = ttk.Frame(self.notebook, padding=16)
         self.notebook.add(frame, text=self.t("stress"))
 
-        self.stress_path_var = tk.StringVar(value=str(self.default_file))
         self.stress_n_var = tk.DoubleVar(value=50)
         self.stress_half_var = tk.DoubleVar(value=7)
         self.stress_factor_var = tk.DoubleVar(value=1.2)
-
-        self._field_block(
-            frame,
-            self.t("file"), self.t("file_help"),
-            self.stress_path_var,
-            row=0,
-            width=68,
-            button=ttk.Button(frame, text=self.t("browse"), command=lambda: self._choose_file("stress")),
-        )
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(2, weight=1)
+        ttk.Label(frame, text=self.t("session_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        self.stress_session_label = ttk.Label(frame, text="", style="Value.TLabel")
+        self.stress_session_label.grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        self._update_session_labels()
 
         self._slider_block(
             frame,
             self.t("tests"), self.t("tests_help"),
             self.stress_n_var,
-            row=3,
+            row=2,
             minimum=5,
             maximum=200,
             formatter=lambda value: f"{float(value):.0f}",
@@ -409,7 +401,7 @@ class PatentApp(tk.Tk):
             frame,
             self.t("half"), self.t("half_help"),
             self.stress_half_var,
-            row=6,
+            row=5,
             minimum=1,
             maximum=30,
             formatter=lambda value: f"{float(value):.0f} giorni",
@@ -419,31 +411,26 @@ class PatentApp(tk.Tk):
             frame,
             self.t("anxiety"), self.t("anxiety_help"),
             self.stress_factor_var,
-            row=9,
+            row=8,
             minimum=1,
             maximum=2,
             formatter=lambda value: f"{float(value):.1f}x",
             step=0.1,
         )
 
-        ttk.Button(frame, text=self.t("calculate_stress"), command=self._run_stress_analysis).grid(row=13, column=0, sticky="w", pady=(18, 10))
-        self._result_panel(frame, 14, "stress")
+        ttk.Button(frame, text=self.t("calculate_stress"), command=self._run_stress_analysis).grid(row=12, column=0, sticky="w", pady=(14, 8))
+        self._result_panel(frame, 13, "stress")
 
-        self.stress_chart = tk.Frame(frame, bg="#111827", height=220)
-        self.stress_chart.grid(row=14, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
+        self.stress_chart = tk.Frame(frame, bg="#111827", height=180)
+        self.stress_chart.grid(row=13, column=2, rowspan=2, sticky="nsew", padx=(12, 0), pady=(12, 0))
 
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(2, weight=1)
-        frame.rowconfigure(14, weight=1)
+        frame.rowconfigure(13, weight=1)
 
-    def _choose_file(self, target="base"):
-        file_types = [("Excel", "*.xlsx"), ("Excel legacy", "*.xls"), ("Tutti i file", "*.*")]
-        selected = filedialog.askopenfilename(filetypes=file_types)
-        if selected:
-            if target == "stress":
-                self.stress_path_var.set(selected)
-            else:
-                self.path_var.set(selected)
+    def _update_session_labels(self):
+        if hasattr(self, "base_session_label") and self.base_session_label.winfo_exists():
+            self.base_session_label.configure(text=f"{len(self.records)} {self.t('session_count')}")
+        if hasattr(self, "stress_session_label") and self.stress_session_label.winfo_exists():
+            self.stress_session_label.configure(text=f"{len(self.records)} {self.t('session_count')}")
 
     def _format_result(self, result):
         if isinstance(result, dict):
@@ -477,38 +464,10 @@ class PatentApp(tk.Tk):
         for child in container.winfo_children():
             child.destroy()
 
-    def _show_distribution_chart(self, container, nome_file, n_test):
+    def _show_records_chart(self, container, records):
         self._clear_chart(container)
         try:
-            distribuzione = distribuzione_errori(nome_file, n_test)
-            labels = ["0", "1", "2", "3", "4+"]
-            values = [distribuzione.get(0, 0), distribuzione.get(1, 0), distribuzione.get(2, 0), distribuzione.get(3, 0), distribuzione.get(4, 0)]
-
-            fig = Figure(figsize=(4.8, 2.2), dpi=100, facecolor="#111827")
-            ax = fig.add_subplot(111)
-            ax.set_facecolor("#111827")
-            ax.bar(labels, values, color=["#38bdf8", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171"])
-            ax.set_title(self.t("chart"), color="#e2e8f0", fontsize=10, pad=8)
-            ax.set_xlabel(self.t("errors"), color="#cbd5e1", fontsize=8)
-            ax.set_ylabel(self.t("occurrences"), color="#cbd5e1", fontsize=8)
-            ax.tick_params(colors="#cbd5e1", labelsize=8)
-            for spine in ax.spines.values():
-                spine.set_color("#475569")
-            ax.set_axisbelow(True)
-            ax.grid(axis="y", linestyle="--", color="#475569", alpha=0.45)
-            fig.tight_layout(pad=1.2)
-
-            canvas = FigureCanvasTkAgg(fig, master=container)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill="both", expand=True)
-        except Exception:
-            label = ttk.Label(container, text=self.t("no_chart"), foreground="#fca5a5")
-            label.pack(padx=12, pady=12)
-
-    def _show_records_chart(self, container):
-        self._clear_chart(container)
-        try:
-            distribuzione = distribuzione_errori_records(self.records)
+            distribuzione = distribuzione_errori_records(records)
             labels = ["0", "1", "2", "3", "4+"]
             values = [distribuzione.get(0, 0), distribuzione.get(1, 0), distribuzione.get(2, 0), distribuzione.get(3, 0), distribuzione.get(4, 0)]
             fig = Figure(figsize=(5.8, 2.1), dpi=100, facecolor="#111827")
@@ -531,14 +490,11 @@ class PatentApp(tk.Tk):
 
     def _run_base_analysis(self):
         try:
-            nome_file = self.path_var.get().strip()
             n_test = int(self.n_test_var.get() or 50)
             emivita = float(self.half_life_var.get() or 7.0)
-            if not nome_file:
-                raise ValueError("Seleziona un file Excel.")
-            result = analizza_predizione_patente(nome_file, n_test_da_analizzare=n_test, emivita_giorni=emivita)
+            result = analizza_predizione_records(self._selected_records(n_test), emivita_giorni=emivita)
             self._display_result(result, "base")
-            self._show_distribution_chart(self.base_chart, nome_file, n_test)
+            self._show_records_chart(self.base_chart, self._selected_records(n_test))
         except Exception as exc:
             messagebox.showerror("Errore", str(exc))
             self._display_result(f"Errore: {exc}", "base")
@@ -546,15 +502,12 @@ class PatentApp(tk.Tk):
 
     def _run_stress_analysis(self):
         try:
-            nome_file = self.stress_path_var.get().strip()
             n_test = int(self.stress_n_var.get() or 50)
             emivita = float(self.stress_half_var.get() or 7.0)
             ansia = float(self.stress_factor_var.get() or 1.2)
-            if not nome_file:
-                raise ValueError("Seleziona un file Excel.")
-            result = analizza_predizione_patente_con_stress(nome_file, n_test, emivita, ansia)
+            result = analizza_predizione_records_con_stress(self._selected_records(n_test), emivita, ansia)
             self._display_result(result, "stress")
-            self._show_distribution_chart(self.stress_chart, nome_file, n_test)
+            self._show_records_chart(self.stress_chart, self._selected_records(n_test))
         except Exception as exc:
             messagebox.showerror("Errore", str(exc))
             self._display_result(f"Errore: {exc}", "stress")
