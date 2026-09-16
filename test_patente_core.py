@@ -4,6 +4,7 @@ import tkinter as tk
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from tkinter import ttk
 
 import pandas as pd
 
@@ -284,6 +285,31 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertTrue(self.app.records_scrollbar.winfo_ismapped())
         visible_text = [child.cget("text") for child in self.app.records_list_frame.winfo_children()[0].winfo_children()]
         self.assertNotIn("Rimuovi selezionato", visible_text)
+
+    def test_graphics_keep_analysis_button_visible_at_startup(self):
+        tab = self.app.notebook.nametowidget(self.app.notebook.tabs()[0])
+        content = tab.winfo_children()[0]
+        analyze_button = next(widget for widget in content.winfo_children() if isinstance(widget, ttk.Button) and widget.cget("text") == self.app.t("analyze_entries"))
+        self.app.update_idletasks()
+        self.assertTrue(analyze_button.winfo_ismapped())
+        self.assertLess(analyze_button.winfo_rooty() + analyze_button.winfo_height(), self.app.winfo_rooty() + self.app.winfo_height())
+
+    def test_graphics_use_dark_scrollbar_and_red_delete_buttons(self):
+        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": 2} for day in range(1, 4)]
+        self.app._refresh_record_list()
+        rows = self.app.records_list_frame.winfo_children()[1:]
+        delete_buttons = [row.winfo_children()[-1] for row in rows]
+        self.assertEqual(len(delete_buttons), 3)
+        self.assertTrue(all(button.cget("bg") == "#ef4444" for button in delete_buttons))
+        self.assertEqual(self.app.tk.call("ttk::style", "lookup", "Dark.Vertical.TScrollbar", "-background"), "#263653")
+
+    def test_graphics_center_tab_content(self):
+        self.app.update_idletasks()
+        tab = self.app.notebook.nametowidget(self.app.notebook.tabs()[0])
+        content = tab.winfo_children()[0]
+        tab_center = tab.winfo_rootx() + tab.winfo_width() / 2
+        content_center = content.winfo_rootx() + content.winfo_width() / 2
+        self.assertLess(abs(tab_center - content_center), 2)
 
     def test_gui_persists_settings_for_next_start(self):
         self.app.n_test_var.set(80)

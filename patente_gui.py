@@ -356,6 +356,8 @@ class PatentApp(tk.Tk):
             tk.Label(row, text=display_date, bg="#111c31", fg="#dbeafe", width=24, anchor="w", padx=8, font=("Segoe UI", 9)).pack(side="left")
             tk.Label(row, text=str(int(record["errori"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
             tk.Button(row, text="×", command=lambda item=record: self._remove_record(item), bg="#ef4444", fg="#ffffff", activebackground="#f87171", activeforeground="#ffffff", relief="flat", bd=0, width=3, font=("Segoe UI", 10, "bold"), cursor="hand2").pack(side="right", padx=6)
+        visible_rows = min(max(len(self.records), 1), 10)
+        self.records_canvas.configure(height=36 + visible_rows * 28)
         self.records_canvas.configure(scrollregion=self.records_canvas.bbox("all"))
         if len(self.records) > 10:
             self.records_scrollbar.grid()
