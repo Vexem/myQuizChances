@@ -4,201 +4,155 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-SOGLIA_ERRORI = 3
+PASSING_ERROR_LIMIT = 3
 
 
-def _load_excel_rows(nome_file):
-    path = Path(nome_file)
+def load_excel_groups(file_name):
+    path = Path(file_name)
     if not path.exists():
-        raise FileNotFoundError(f"File non trovato: {nome_file}")
+        raise FileNotFoundError(f"File not found: {file_name}")
 
-    df = pd.read_excel(path, header=None)
+    frame = pd.read_excel(path, header=None)
+    if frame.empty:
+        raise ValueError("The Excel file is empty.")
+    if frame.shape[1] < 2:
+        raise ValueError("The Excel file must contain a date column and result columns.")
 
-    if df.empty:
-        raise ValueError("Il file Excel è vuoto.")
-
-    if df.shape[1] < 2:
-        raise ValueError("Il file Excel deve contenere almeno due colonne: Data e risultati dei test.")
-
-    rows = []
-    for _, row in df.iterrows():
+    groups = []
+    for _, row in frame.iterrows():
         if row.empty:
             continue
-
         try:
-            data_del_test = pd.to_datetime(row.iloc[0])
+            test_date = pd.to_datetime(row.iloc[0])
         except (TypeError, ValueError):
             continue
 
-        valori = []
-        for valore in row.iloc[1:]:
-            if pd.isna(valore):
+        errors = []
+        for value in row.iloc[1:]:
+            if pd.isna(value):
                 continue
             try:
-                numero = float(valore)
+                errors.append(float(value))
             except (TypeError, ValueError):
                 continue
-            valori.append(numero)
+        if errors:
+            groups.append({"date": test_date, "errors": errors})
 
-        if not valori:
-            continue
-
-        rows.append({"data": data_del_test, "errori": valori})
-
-    if not rows:
-        raise ValueError("Non ho trovato dati numerici nel file Excel.")
-
-    return rows
+    if not groups:
+        raise ValueError("No numeric test results were found in the Excel file.")
+    return groups
 
 
-def _estrai_ultimi_test(dati, n_test_da_analizzare):
-    dati_ordinati = sorted(dati, key=lambda x: x["data"])
-    ultimi_test = dati_ordinati[-n_test_da_analizzare:]
-    eventi = []
-    for item in ultimi_test:
-        for errore in item["errori"]:
-            eventi.append({"data": item["data"], "errori": float(errore)})
-    return eventi
+def flatten_recent_events(groups, row_limit):
+    ordered_groups = sorted(groups, key=lambda item: item["date"])
+    recent_groups = ordered_groups[-row_limit:]
+    return [
+        {"date": group["date"], "errors": float(error)}
+        for group in recent_groups
+        for error in group["errors"]
+    ]
 
 
-def _poisson_cdf_3(lam):
-    prob = 0.0
-    for x in range(SOGLIA_ERRORI + 1):
-        prob += (math.exp(-lam) * (lam ** x)) / math.factorial(x)
-    return min(100.0, prob * 100)
+def poisson_cdf_at_limit(expected_errors):
+    probability = 0.0
+    for error_count in range(PASSING_ERROR_LIMIT + 1):
+        probability += (math.exp(-expected_errors) * expected_errors ** error_count) / math.factorial(error_count)
+    return min(100.0, probability * 100)
 
 
-def _analizza_eventi(eventi, emivita_giorni):
-    if not eventi:
-        raise ValueError("Non ci sono risultati da analizzare.")
-    if emivita_giorni <= 0:
-        raise ValueError("L'emivita deve essere maggiore di zero.")
+def analyze_events(events, half_life_days):
+    if not events:
+        raise ValueError("There are no results to analyze.")
+    if half_life_days <= 0:
+        raise ValueError("Half-life must be greater than zero.")
 
-    dati_strutturati = sorted(eventi, key=lambda x: x["data"])
-    data_riferimento = dati_strutturati[-1]["data"]
-    k = math.log(2) / emivita_giorni
-    pesi = []
-    errori = []
-    for item in dati_strutturati:
-        giorni_di_distanza = max(0, (data_riferimento - item["data"]).days)
-        pesi.append(math.exp(-k * giorni_di_distanza))
-        errori.append(float(item["errori"]))
+    ordered_events = sorted(events, key=lambda item: item["date"])
+    reference_date = ordered_events[-1]["date"]
+    decay_rate = math.log(2) / half_life_days
+    weights = []
+    errors = []
+    for event in ordered_events:
+        days_since_test = max(0, (reference_date - event["date"]).days)
+        weights.append(math.exp(-decay_rate * days_since_test))
+        errors.append(float(event["errors"]))
 
-    pesi_norm = np.array(pesi, dtype=float) / np.sum(pesi)
-    errori_array = np.array(errori, dtype=float)
-    lambda_atteso = float(np.sum(errori_array * pesi_norm))
-    test_superati = int(sum(1 for errore in errori_array if errore <= SOGLIA_ERRORI))
+    normalized_weights = np.array(weights, dtype=float) / np.sum(weights)
+    error_values = np.array(errors, dtype=float)
+    expected_errors = float(np.sum(error_values * normalized_weights))
+    passed_tests = int(sum(error <= PASSING_ERROR_LIMIT for error in error_values))
     return {
-        "test_analizzati": len(errori_array),
-        "data_riferimento": data_riferimento.strftime("%d/%m/%Y"),
-        "emivita": emivita_giorni,
-        "lambda_atteso": lambda_atteso,
-        "test_superati": test_superati,
-        "perc_storica": (test_superati / len(errori_array)) * 100,
-        "prob_predittiva": _poisson_cdf_3(lambda_atteso),
+        "tests_analyzed": len(error_values),
+        "reference_date": reference_date.strftime("%d/%m/%Y"),
+        "half_life": half_life_days,
+        "expected_errors": expected_errors,
+        "passed_tests": passed_tests,
+        "historical_percentage": (passed_tests / len(error_values)) * 100,
+        "predicted_probability": poisson_cdf_at_limit(expected_errors),
     }
 
 
-def _normalizza_records(records):
-    eventi = []
+def normalize_records(records):
+    events = []
     for record in records:
-        data = pd.to_datetime(record["data"])
-        errori = float(record["errori"])
-        if errori < 0:
-            raise ValueError("Il numero di errori non può essere negativo.")
-        eventi.append({"data": data, "errori": errori})
-    return eventi
+        test_date = pd.to_datetime(record["date"])
+        errors = float(record["errors"])
+        if errors < 0:
+            raise ValueError("The number of errors cannot be negative.")
+        events.append({"date": test_date, "errors": errors})
+    return events
 
 
-def analizza_predizione_records(records, emivita_giorni=7.0):
-    """Analyze results already held by the application, without reading files."""
+def analyze_records(records, half_life_days=7.0):
     try:
-        return _analizza_eventi(_normalizza_records(records), emivita_giorni)
+        return analyze_events(normalize_records(records), half_life_days)
     except Exception as error:
-        return f"Si è verificato un errore: {error}"
+        return f"Analysis error: {error}"
 
 
-def analizza_predizione_records_con_stress(records, emivita_giorni, moltiplicatore_ansia):
-    """Analyze in-memory results under normal and stress conditions."""
+def analyze_records_with_anxiety(records, half_life_days, anxiety_factor):
     try:
-        base = _analizza_eventi(_normalizza_records(records), emivita_giorni)
-        lambda_base = base["lambda_atteso"]
-        lambda_stress = lambda_base * moltiplicatore_ansia
+        base_result = analyze_events(normalize_records(records), half_life_days)
+        base_expected_errors = base_result["expected_errors"]
+        stress_expected_errors = base_expected_errors * anxiety_factor
         return {
-            "test_analizzati": base["test_analizzati"],
-            "data_rif": base["data_riferimento"],
-            "lambda_base": lambda_base,
-            "lambda_stress": lambda_stress,
-            "prob_base": _poisson_cdf_3(lambda_base),
-            "prob_stress": _poisson_cdf_3(lambda_stress),
+            "tests_analyzed": base_result["tests_analyzed"],
+            "reference_date": base_result["reference_date"],
+            "base_expected_errors": base_expected_errors,
+            "stress_expected_errors": stress_expected_errors,
+            "base_probability": poisson_cdf_at_limit(base_expected_errors),
+            "stress_probability": poisson_cdf_at_limit(stress_expected_errors),
         }
     except Exception as error:
-        return f"Errore durante il calcolo: {error}"
+        return f"Analysis error: {error}"
 
 
-def distribuzione_errori_records(records):
-    distribuzione = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-    for record in _normalizza_records(records):
-        errore = int(record["errori"])
-        distribuzione[min(errore, 4)] += 1
-    return distribuzione
+def error_distribution_from_records(records):
+    distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+    for record in normalize_records(records):
+        error_count = int(record["errors"])
+        distribution[min(error_count, 4)] += 1
+    return distribution
 
 
-def analizza_predizione_patente(nome_file, n_test_da_analizzare=9999, emivita_giorni=7.0):
+def analyze_excel(file_name, row_limit=9999, half_life_days=7.0):
     try:
-        dati = _load_excel_rows(nome_file)
-        eventi = _estrai_ultimi_test(dati, n_test_da_analizzare)
-        return _analizza_eventi(eventi, emivita_giorni)
-    except Exception as e:
-        return f"Si è verificato un errore: {e}"
+        events = flatten_recent_events(load_excel_groups(file_name), row_limit)
+        return analyze_events(events, half_life_days)
+    except Exception as error:
+        return f"Analysis error: {error}"
 
 
-def distribuzione_errori(nome_file, n_test_da_analizzare=50):
-    dati = _load_excel_rows(nome_file)
-    eventi = _estrai_ultimi_test(dati, n_test_da_analizzare)
-    distribuzione = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-    for item in eventi:
-        errore = int(item["errori"])
-        if errore >= 4:
-            distribuzione[4] += 1
-        else:
-            distribuzione[errore] = distribuzione.get(errore, 0) + 1
-    return distribuzione
+def error_distribution_from_excel(file_name, row_limit=50):
+    events = flatten_recent_events(load_excel_groups(file_name), row_limit)
+    return error_distribution_from_records(
+        [{"date": event["date"], "errors": event["errors"]} for event in events]
+    )
 
 
-def analizza_predizione_patente_con_stress(nome_file, n_test_da_analizzare, emivita_giorni, moltiplicatore_ansia):
+def analyze_excel_with_anxiety(file_name, row_limit, half_life_days, anxiety_factor):
     try:
-        dati = _load_excel_rows(nome_file)
-        eventi = _estrai_ultimi_test(dati, n_test_da_analizzare)
-        if not eventi:
-            return "Errore: non ho trovato punteggi numerici nel file."
-
-        dati_strutturati = sorted(eventi, key=lambda x: x["data"])
-        data_odierna = dati_strutturati[-1]["data"]
-        k_decay = math.log(2) / emivita_giorni
-
-        pesi = []
-        errori = []
-        for item in dati_strutturati:
-            diff_giorni = max(0, (data_odierna - item["data"]).days)
-            peso = math.exp(-k_decay * diff_giorni)
-            pesi.append(peso)
-            errori.append(item["errori"])
-
-        pesi_norm = np.array(pesi, dtype=float) / np.sum(pesi)
-        lambda_base = float(np.sum(np.array(errori, dtype=float) * pesi_norm))
-        lambda_stress = lambda_base * moltiplicatore_ansia
-
-        prob_base = _poisson_cdf_3(lambda_base)
-        prob_stress = _poisson_cdf_3(lambda_stress)
-
-        return {
-            "test_analizzati": len(errori),
-            "data_rif": data_odierna.strftime("%d/%m/%Y"),
-            "lambda_base": lambda_base,
-            "lambda_stress": lambda_stress,
-            "prob_base": prob_base,
-            "prob_stress": prob_stress,
-        }
-    except Exception as e:
-        return f"Errore durante il calcolo: {e}"
+        events = flatten_recent_events(load_excel_groups(file_name), row_limit)
+        records = [{"date": event["date"], "errors": event["errors"]} for event in events]
+        return analyze_records_with_anxiety(records, half_life_days, anxiety_factor)
+    except Exception as error:
+        return f"Analysis error: {error}"

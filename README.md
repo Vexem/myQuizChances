@@ -1,48 +1,36 @@
-# Analisi Patente
+# Driving Test Probability Analysis
 
-Applicazione desktop per stimare la probabilita di superare l'esame di teoria della patente a partire dallo storico dei quiz. Il progetto include una GUI in italiano e inglese, analisi base, simulazione dello stress, grafico della distribuzione degli errori e packaging Windows.
+A desktop application for estimating driving-theory test performance from a quiz history. The application provides Italian and English UI localization, in-app result entry, optional anxiety analysis, charts, automatic local persistence, and Windows packaging.
 
-> La stima e un supporto statistico orientativo, non una garanzia del risultato d'esame.
+> The result is an indicative statistical estimate, not a guarantee of the exam outcome.
 
-## Funzionalita
+## Features
 
-- Analisi probabilistica dello storico dei quiz.
-- Peso maggiore ai test recenti tramite decadimento esponenziale.
-- Modello di Poisson con soglia di superamento impostata a 3 errori.
-- Scenario con ansia tramite moltiplicatore delle difficolta.
-- Selezione dei parametri tramite barre interattive.
-- Selezione della data tramite calendario popup interno.
-- Grafico della distribuzione degli errori.
-- Interfaccia in italiano e inglese.
-- Selettore lingua con icone delle bandiere.
-- Test automatici del motore e dei principali componenti GUI.
-- Eseguibile Windows generabile con PyInstaller.
-- Inserimento diretto dei risultati nell'app senza caricare file esterni.
-- Salvataggio automatico locale dopo ogni modifica.
-- Ripristino automatico dei risultati all'avvio.
-- Cancellazione manuale di una singola entry o dell'intero elenco.
-- Pulsante `x` rosso accanto a ogni entry per la cancellazione diretta.
-- Impostazioni ripristinate automaticamente all'avvio successivo.
+- Time-weighted probability analysis.
+- Greater relevance for recent tests through exponential decay.
+- Poisson model with a three-error passing threshold.
+- Optional anxiety multiplier and normal-versus-stress comparison.
+- Interactive parameter sliders.
+- In-app calendar date picker.
+- Scrollable result list with a red delete button per entry.
+- Italian and English interface.
+- Flag-based language selector.
+- Popup analysis report with chart.
+- Automatic record and settings persistence.
+- Full unit and GUI presentation test suite.
+- Windows executable packaging with PyInstaller.
 
-## Requisiti
+## Requirements
 
-- Windows 10 o superiore consigliato.
-- Python 3.12 consigliato.
+- Windows 10 or newer recommended.
+- Python 3.12 recommended.
 - PowerShell.
-- Un file Excel `.xlsx` con lo storico dei quiz.
+- Python packages: `pandas`, `numpy`, `openpyxl`, `matplotlib`, and `Pillow`.
+- `pyinstaller` is required only to build the executable.
 
-Le dipendenze principali sono:
+## Installation
 
-- `pandas`
-- `numpy`
-- `openpyxl`
-- `matplotlib`
-- `Pillow`
-- `pyinstaller` per creare l'eseguibile
-
-## Installazione
-
-Dalla cartella del progetto:
+From the project directory:
 
 ```powershell
 python -m venv .venv
@@ -51,281 +39,199 @@ python -m pip install --upgrade pip
 python -m pip install pandas numpy openpyxl matplotlib Pillow pyinstaller
 ```
 
-Se il virtual environment esiste gia, basta attivarlo:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-## Avvio della GUI
-
-Con il virtual environment attivo:
-
-```powershell
-python patente_gui.py
-```
-
-In alternativa, senza attivare l'ambiente:
+## Run the application
 
 ```powershell
 .\.venv\Scripts\python.exe patente_gui.py
 ```
 
-L'applicazione si apre con due schede:
+The application has two tabs:
 
-- **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
-- **Impostazioni** / **Settings**: configura numero di test, emivita e valutazione ansia.
+- **Inserisci risultati / Enter results**: enter and manage quiz results.
+- **Impostazioni / Settings**: configure the analysis parameters.
 
-La scheda Impostazioni/Settings serve solo a cambiare le impostazioni. Non permette di inserire percorsi o caricare file: usa esclusivamente i risultati aggiunti nella scheda Inserisci risultati.
+## Entering results
 
-## Inserimento senza file
+1. Select a date with the calendar button.
+2. Set the error count with the slider.
+3. Press **Aggiungi risultato / Add result**.
+4. Repeat for every completed quiz.
+5. Press **Analizza risultati inseriti / Analyze entered results**.
 
-La scheda **Inserisci risultati** e una proposta alternativa al caricamento di Excel pensata per essere compatibile anche con una futura app Android:
+The report opens in a centered popup and does not add permanent widgets to the main window.
 
-1. inserisci la data del test;
-2. seleziona il numero di errori con la barra interattiva;
-3. premi **Aggiungi risultato**;
-4. ripeti per tutti i test della sessione;
-5. premi **Analizza risultati inseriti** per aprire il report in una finestra popup.
+The visible date format is `DD/MM/YYYY`. Dates are normalized internally to `YYYY-MM-DD` for sorting, storage, and analysis.
 
-Nella scheda **Impostazioni** / **Settings** puoi scegliere:
-
-- **Senza ansia**: calcolo standard;
-- **Con ansia**: calcolo standard e confronto con il moltiplicatore di ansia scelto. Quando e deselezionato, il cursore e le relative indicazioni diventano grigi e non interagibili.
-
-Il pulsante **Analizza risultati inseriti** resta nella scheda Inserisci risultati e apre il report in un popup dedicato.
-
-La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo mostra il formato italiano `GG/MM/AAAA`; internamente il valore viene normalizzato in `YYYY-MM-DD` per storage e calcoli.
-
-I record sono rappresentati internamente in forma semplice:
+Each record is represented internally as:
 
 ```python
-{"data": "2026-09-16", "errori": 2}
+{"date": "2026-09-16", "errors": 2}
 ```
 
-Il motore di analisi riceve una lista di questi record tramite `analizza_predizione_records`. Questo separa l'inserimento dall'analisi: in futuro Android potra sostituire la schermata Tkinter mantenendo lo stesso contratto dati e lo stesso motore statistico. Durante l'esecuzione i record restano in memoria e vengono sincronizzati automaticamente con lo storage locale.
+The red `x` button next to a record removes only that record. **Svuota elenco / Clear list** removes all records.
 
-### Persistenza locale
+When more than ten records are present, the list becomes scrollable.
 
-I record non vengono persi chiudendo l'applicazione. Dopo ogni aggiunta, cancellazione singola o svuotamento dell'elenco, l'app salva automaticamente i dati in JSON:
+## Automatic persistence
+
+Records are saved immediately after every addition, single deletion, or clear-all operation. Settings are saved immediately after every slider or anxiety-mode change.
+
+On Windows, the default files are stored outside the repository:
 
 ```text
 %LOCALAPPDATA%\AnalisiPatente\records.json
-```
-
-Il salvataggio usa un file temporaneo e una sostituzione atomica, per evitare di lasciare un archivio parzialmente scritto in caso di interruzione. All'avvio il file viene ricaricato automaticamente. Se il contenuto non e leggibile, l'app mostra un errore e non sovrascrive il file danneggiato.
-
-La cancellazione e sempre esplicita: la `x` rossa accanto a una entry elimina solo quella entry, mentre **Svuota elenco** elimina tutti i risultati salvati.
-
-Anche i parametri della scheda **Impostazioni** / **Settings** vengono salvati automaticamente in:
-
-```text
 %LOCALAPPDATA%\AnalisiPatente\settings.json
 ```
 
-Sono persistiti il numero di test, l'emivita, la modalita ansia e il relativo moltiplicatore. Non serve un pulsante Salva.
+The storage layer writes through temporary files and atomic replacement to avoid truncated files after an interrupted write. Existing legacy record keys are migrated when read. Corrupt data is reported without silently overwriting the source file.
 
-## Utilizzo della GUI
+## Settings
 
-### Formato Excel compatibile del motore
+The Settings tab controls:
 
-Il caricamento Excel resta disponibile nelle API del motore per compatibilita e test, ma non fa parte del flusso principale della GUI. Il file deve avere una struttura a righe:
+- **Number of tests**: how many recent date groups are considered.
+- **Half-life**: after how many days an old result has half the weight of a recent result.
+- **Without anxiety**: uses the standard probability model.
+- **With anxiety**: enables the anxiety multiplier and shows the normal-versus-stress comparison.
 
-| Data | Quiz 1 | Quiz 2 | Quiz 3 |
-|---|---:|---:|---:|
-| 2026-05-01 | 2 | 1 | 4 |
-| 2026-05-02 | 0 | 3 | 1 |
+Settings are restored automatically on the next application start. No Save button is required.
 
-- La prima colonna contiene la data del gruppo di test.
-- Le colonne successive contengono il numero di errori.
-- Le celle vuote e i valori non numerici vengono ignorati.
-- Le righe con date non valide vengono ignorate.
-- Il dataset di compatibilita incluso nel progetto e `SCHEMA TEST PATENTE.xlsx`.
+## Statistical model
 
-### Parametri
-
-#### Numero di test
-
-Definisce quante righe recenti considerare. Un valore maggiore usa uno storico piu ampio e generalmente produce una stima piu stabile.
-
-#### Emivita in giorni
-
-Indica dopo quanti giorni il peso statistico di un test si dimezza:
-
-- valore basso: privilegia molto i test recenti;
-- valore alto: conserva piu influenza dello storico;
-- il valore mostrato nella GUI e espresso in giorni interi.
-
-#### Moltiplicatore ansia
-
-Disponibile nella scheda **Impostazioni** / **Settings** quando viene selezionato **Con ansia**:
-
-- `1.0`: condizioni normali;
-- `1.2`: stress moderato;
-- `1.5`: stress elevato.
-
-Il moltiplicatore aumenta il numero di errori attesi nel modello di stress.
-
-## Modello statistico
-
-### Decadimento temporale
-
-Per ogni test viene calcolato un peso in base alla distanza dall'ultimo test:
+For each result, the application calculates a time-decay weight:
 
 ```text
-peso = exp(-k * giorni trascorsi)
-k = ln(2) / emivita
+weight = exp(-decay_rate * days_since_test)
+decay_rate = ln(2) / half_life
 ```
 
-I pesi vengono normalizzati e usati per calcolare la media pesata degli errori, indicata nel risultato come `lambda`.
-
-### Distribuzione di Poisson
-
-La probabilita stimata di superamento e la probabilita di ottenere da 0 a 3 errori secondo una distribuzione di Poisson:
+The weighted average error count is the expected error value. The predicted passing probability is the Poisson cumulative probability from zero through three errors:
 
 ```text
 P(X <= 3) = P(0) + P(1) + P(2) + P(3)
 P(X = x) = exp(-lambda) * lambda^x / x!
 ```
 
-La soglia di 3 errori e definita in `SOGLIA_ERRORI` dentro `patente_core.py`.
+The anxiety scenario multiplies the expected error value before calculating the second probability.
 
-### Interpretazione
+The model does not account for fatigue, question difficulty, exam conditions, or changes in study habits.
 
-- **Probabilita predittiva**: stima matematica basata sul valore `lambda` recente.
-- **Percentuale storica**: quota di test con 3 errori o meno.
-- **Errori attesi**: media pesata degli errori.
-- **Scenario ansia**: stessa stima dopo aver moltiplicato gli errori attesi per il fattore scelto.
+## Excel compatibility API
 
-Il modello non considera fattori come stanchezza reale, difficolta specifica delle domande, condizioni dell'esame o cambiamenti nel metodo di studio.
+The main GUI does not require external files. Excel support remains available in the core API for compatibility and tests. The expected layout is:
 
-## Struttura del progetto
+| Date | Quiz 1 | Quiz 2 | Quiz 3 |
+|---|---:|---:|---:|
+| 2026-05-01 | 2 | 1 | 4 |
+| 2026-05-02 | 0 | 3 | 1 |
+
+The first column contains dates. Subsequent columns contain error counts. Blank and non-numeric cells are ignored.
+
+The bundled `SCHEMA TEST PATENTE.xlsx` file is a compatibility dataset, not a requirement for the GUI.
+
+## Project structure
 
 ```text
-patente_gui.py             Interfaccia desktop Tkinter
-patente_core.py            Calcoli, record in memoria, Excel e distribuzione errori
-patente_storage.py         Persistenza locale atomica dei record
-test_patente_core.py       Suite di test automatici
-AnalisiPatente.spec        Configurazione PyInstaller
-SCHEMA TEST PATENTE.xlsx   Dataset Excel predefinito
-assets/italy.png           Icona lingua italiana
-assets/uk.png              Icona lingua inglese
-.gitignore                 File esclusi dal versionamento
+patente_gui.py             Tkinter desktop interface
+patente_core.py            English statistical core and Excel compatibility API
+patente_storage.py         Atomic local records and settings persistence
+test_patente_core.py       Core, storage, GUI, and presentation tests
+AnalisiPatente.spec        PyInstaller configuration
+SCHEMA TEST PATENTE.xlsx   Compatibility dataset
+assets/italy.png           Italian language icon
+assets/uk.png              English language icon
+.gitignore                 Ignored generated and local files
 ```
 
-## Test
+## Tests
 
-Esegui la suite completa usando lo stesso ambiente della GUI:
+Run the complete suite with:
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest -v
 ```
 
-La suite verifica:
+The suite covers:
 
-- risultati dell'analisi base;
-- applicazione del limite ai test recenti;
-- celle non valide e righe non valide;
-- file mancanti e dataset privi di punteggi;
-- distribuzione degli errori, inclusa la categoria `4+`;
-- modello con ansia;
-- gestione dell'emivita non valida;
-- presenza degli slider GUI;
-- menu lingua e cambio italiano/inglese.
-- salvataggio e caricamento dei record;
-- archivio mancante o corrotto;
-- persistenza dopo riavvio dell'app;
-- cancellazione di una singola entry;
-- popup dei risultati e modalita ansia.
+- Excel and in-memory analysis;
+- invalid and missing input;
+- anxiety calculations;
+- record and settings storage round trips;
+- corrupt storage and invalid schemas;
+- persistence after application restart;
+- single-record deletion and clear-all behavior;
+- date picker selection;
+- language switching;
+- anxiety control states;
+- popup reports;
+- tab centering;
+- startup button visibility;
+- red delete-button styling;
+- scrollbar threshold and presentation geometry.
 
-Controllo sintattico:
-
-```powershell
-.\.venv\Scripts\python.exe -m py_compile patente_core.py patente_gui.py
-```
-
-## Creazione dell'eseguibile Windows
-
-Per una build con cartella di distribuzione:
+Compile checks:
 
 ```powershell
-.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --name AnalisiPatente --add-data "assets;assets" --add-data "SCHEMA TEST PATENTE.xlsx;." patente_gui.py
+.\.venv\Scripts\python.exe -m py_compile patente_core.py patente_gui.py patente_storage.py
 ```
 
-Per un singolo file `.exe`:
+## Build the Windows executable
+
+For a single executable:
 
 ```powershell
 .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name AnalisiPatente --add-data "assets;assets" --add-data "SCHEMA TEST PATENTE.xlsx;." patente_gui.py
 ```
 
-Il risultato viene creato in:
+The output is created at:
 
 ```text
 dist/AnalisiPatente.exe
 ```
 
-`build/` e `dist/` sono artefatti generati e sono esclusi da Git.
+Generated `build/` and `dist/` folders are excluded from Git.
 
-## Git e sviluppo
-
-Verifica lo stato:
+## Git workflow
 
 ```powershell
 git status --short --branch
-```
-
-Esegui test e compilazione prima di un commit:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest -q
-.\.venv\Scripts\python.exe -m py_compile patente_core.py patente_gui.py
-```
-
-Commit consigliato:
-
-```powershell
 git add -A
-git commit -m "docs: add project documentation"
-git push origin main
+git commit -m "describe the change"
+git push origin feature/in-app-results-entry
 ```
 
-Repository remoto attuale:
+Remote repository:
 
 ```text
 https://github.com/Vexem/myQuizChances
 ```
 
-## Risoluzione problemi
+## Troubleshooting
 
 ### `ModuleNotFoundError`
 
-Il comando e stato eseguito con un interprete diverso dal virtual environment. Usa sempre:
+Use the project virtual environment explicitly:
 
 ```powershell
 .\.venv\Scripts\python.exe patente_gui.py
 ```
 
-### La finestra non compare
+### The window is not visible
 
-Controlla che il processo non sia gia aperto dietro VS Code o in un altro desktop virtuale. La GUI centra la finestra e la porta temporaneamente in primo piano all'avvio.
+Check whether it opened behind another window. The application centers itself and briefly brings the window to the foreground.
 
-### Il grafico non appare
+### The saved data cannot be read
 
-Verifica che `matplotlib` sia installato nel venv:
+The application reports the storage error without silently overwriting the source file. Inspect the files under `%LOCALAPPDATA%\AnalisiPatente` before removing anything.
+
+### The chart does not appear
+
+Verify Matplotlib in the project environment:
 
 ```powershell
 .\.venv\Scripts\python.exe -c "import matplotlib; print(matplotlib.__version__)"
 ```
 
-### Il file Excel non viene letto
+## Data and privacy
 
-Controlla che:
-
-- il file esista;
-- sia un `.xlsx` leggibile;
-- la prima colonna contenga date valide;
-- almeno una colonna successiva contenga numeri.
-
-## Licenza e dati
-
-Il repository contiene dataset Excel locali usati per il funzionamento e la verifica dell'applicazione. Verifica di avere il diritto di condividere eventuali dati reali prima di pubblicarli su un repository remoto.
+Local records are stored outside the repository. Do not publish personal quiz history or other sensitive data to a remote repository.

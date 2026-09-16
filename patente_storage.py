@@ -27,9 +27,13 @@ def _validate_records(records):
 
     validated = []
     for record in records:
-        if not isinstance(record, dict) or "data" not in record or "errori" not in record:
+        if not isinstance(record, dict):
             raise StorageError("A saved record has an invalid structure.")
-        validated.append({"data": str(record["data"]), "errori": int(record["errori"])})
+        record_date = record.get("date", record.get("data"))
+        record_errors = record.get("errors", record.get("errori"))
+        if record_date is None or record_errors is None:
+            raise StorageError("A saved record has an invalid structure.")
+        validated.append({"date": str(record_date), "errors": int(record_errors)})
     return validated
 
 

@@ -9,12 +9,12 @@ from tkinter import ttk
 import pandas as pd
 
 from patente_core import (
-    analizza_predizione_patente,
-    analizza_predizione_records,
-    analizza_predizione_records_con_stress,
-    analizza_predizione_patente_con_stress,
-    distribuzione_errori,
-    distribuzione_errori_records,
+    analyze_excel,
+    analyze_excel_with_anxiety,
+    analyze_records,
+    analyze_records_with_anxiety,
+    error_distribution_from_excel,
+    error_distribution_from_records,
 )
 from patente_storage import StorageError, load_records, load_settings, save_records, save_settings
 
@@ -35,15 +35,15 @@ class PatentCoreTestCase(unittest.TestCase):
             ['2024-01-03', 2, 3, 1],
             ['2024-01-04', 1, 0, 2],
         ]) as path:
-            result = analizza_predizione_patente(path, n_test_da_analizzare=10, emivita_giorni=7)
+            result = analyze_excel(path, row_limit=10, half_life_days=7)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['test_analizzati'], 12)
-        self.assertEqual(result['test_superati'], 12)
-        self.assertEqual(result['data_riferimento'], '04/01/2024')
-        self.assertGreaterEqual(result['prob_predittiva'], 0)
-        self.assertLessEqual(result['prob_predittiva'], 100)
-        self.assertGreater(result['lambda_atteso'], 0)
+        self.assertEqual(result['tests_analyzed'], 12)
+        self.assertEqual(result['passed_tests'], 12)
+        self.assertEqual(result['reference_date'], '04/01/2024')
+        self.assertGreaterEqual(result['predicted_probability'], 0)
+        self.assertLessEqual(result['predicted_probability'], 100)
+        self.assertGreater(result['expected_errors'], 0)
 
     def test_test_limit_is_applied_by_date_row(self):
         with self.create_workbook([
@@ -51,10 +51,10 @@ class PatentCoreTestCase(unittest.TestCase):
             ['2024-01-02', 5, 5],
             ['2024-01-03', 1, 1],
         ]) as path:
-            result = analizza_predizione_patente(path, n_test_da_analizzare=1, emivita_giorni=7)
+            result = analyze_excel(path, row_limit=1, half_life_days=7)
 
-        self.assertEqual(result['test_analizzati'], 2)
-        self.assertEqual(result['test_superati'], 2)
+        self.assertEqual(result['tests_analyzed'], 2)
+        self.assertEqual(result['passed_tests'], 2)
 
     def test_invalid_cells_and_rows_are_ignored(self):
         with self.create_workbook([
@@ -62,30 +62,30 @@ class PatentCoreTestCase(unittest.TestCase):
             ['2024-01-01', 'bad', 2, None],
             ['2024-01-02', 1, '3'],
         ]) as path:
-            result = analizza_predizione_patente(path, n_test_da_analizzare=50, emivita_giorni=7)
+            result = analyze_excel(path, row_limit=50, half_life_days=7)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['test_analizzati'], 3)
+        self.assertEqual(result['tests_analyzed'], 3)
 
     def test_missing_file_returns_readable_error(self):
-        result = analizza_predizione_patente('missing-file.xlsx')
+        result = analyze_excel('missing-file.xlsx')
         self.assertIsInstance(result, str)
-        self.assertIn('File non trovato', result)
+        self.assertIn('File not found', result)
 
     def test_empty_or_non_numeric_file_returns_error(self):
         with self.create_workbook([
             ['2024-01-01', 'no score'],
         ]) as path:
-            result = analizza_predizione_patente(path)
+            result = analyze_excel(path)
 
         self.assertIsInstance(result, str)
-        self.assertIn('dati numerici', result)
+        self.assertIn('numeric test results', result)
 
     def test_distribution_groups_four_or_more_errors(self):
         with self.create_workbook([
             ['2024-01-01', 0, 1, 2, 3, 4, 7],
         ]) as path:
-            result = distribuzione_errori(path, n_test_da_analizzare=10)
+            result = error_distribution_from_excel(path, row_limit=10)
 
         self.assertEqual(result, {0: 1, 1: 1, 2: 1, 3: 1, 4: 2})
 
@@ -95,50 +95,50 @@ class PatentCoreTestCase(unittest.TestCase):
             ['2024-01-02', 1, 2, 3],
             ['2024-01-03', 3, 4, 2],
         ]) as path:
-            result = analizza_predizione_patente_con_stress(path, 10, 7.0, 1.2)
+            result = analyze_excel_with_anxiety(path, 10, 7.0, 1.2)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['test_analizzati'], 9)
-        self.assertGreater(result['lambda_stress'], result['lambda_base'])
-        self.assertLess(result['prob_stress'], result['prob_base'])
-        self.assertLessEqual(result['prob_stress'], 100)
+        self.assertEqual(result['tests_analyzed'], 9)
+        self.assertGreater(result['stress_expected_errors'], result['base_expected_errors'])
+        self.assertLess(result['stress_probability'], result['base_probability'])
+        self.assertLessEqual(result['stress_probability'], 100)
 
     def test_invalid_half_life_is_reported(self):
         with self.create_workbook([
             ['2024-01-01', 1, 2],
         ]) as path:
-            result = analizza_predizione_patente(path, emivita_giorni=0)
+            result = analyze_excel(path, half_life_days=0)
 
         self.assertIsInstance(result, str)
-        self.assertIn('errore', result.lower())
+        self.assertIn('analysis error', result.lower())
 
     def test_in_memory_records_match_file_style_analysis(self):
         records = [
-            {"data": "2024-01-01", "errori": 2},
-            {"data": "2024-01-02", "errori": 0},
-            {"data": "2024-01-03", "errori": 4},
+            {"date": "2024-01-01", "errors": 2},
+            {"date": "2024-01-02", "errors": 0},
+            {"date": "2024-01-03", "errors": 4},
         ]
-        result = analizza_predizione_records(records, emivita_giorni=7)
+        result = analyze_records(records, half_life_days=7)
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result['test_analizzati'], 3)
-        self.assertEqual(result['data_riferimento'], '03/01/2024')
+        self.assertEqual(result['tests_analyzed'], 3)
+        self.assertEqual(result['reference_date'], '03/01/2024')
 
     def test_in_memory_stress_and_distribution(self):
         records = [
-            {"data": "2024-01-01", "errori": 0},
-            {"data": "2024-01-02", "errori": 4},
+            {"date": "2024-01-01", "errors": 0},
+            {"date": "2024-01-02", "errors": 4},
         ]
-        stress = analizza_predizione_records_con_stress(records, 7, 1.2)
-        distribution = distribuzione_errori_records(records)
+        stress = analyze_records_with_anxiety(records, 7, 1.2)
+        distribution = error_distribution_from_records(records)
 
-        self.assertLess(stress['prob_stress'], stress['prob_base'])
+        self.assertLess(stress['stress_probability'], stress['base_probability'])
         self.assertEqual(distribution, {0: 1, 1: 0, 2: 0, 3: 0, 4: 1})
 
     def test_storage_round_trip(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "records.json"
-            records = [{"data": "2026-09-16", "errori": 2}]
+            records = [{"date": "2026-09-16", "errors": 2}]
             save_records(records, path)
             self.assertEqual(load_records(path), records)
 
@@ -156,7 +156,7 @@ class PatentCoreTestCase(unittest.TestCase):
     def test_storage_rejects_invalid_record_schema(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "records.json"
-            save_records([{"data": "2026-09-16", "errori": 1}], path)
+            save_records([{"date": "2026-09-16", "errors": 1}], path)
             path.write_text("[{\"wrong\": 1}]", encoding="utf-8")
             with self.assertRaises(StorageError):
                 load_records(path)
@@ -224,7 +224,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertEqual(self.app.entry_date_var.get(), '20/09/2026')
 
     def test_gui_uses_correct_result_wording(self):
-        records = [{"data": "2026-09-16", "errori": 1}]
+        records = [{"date": "2026-09-16", "errors": 1}]
         self.app.records.extend(records)
         self.app._open_entry_analysis()
         self.app.update_idletasks()
@@ -233,7 +233,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.popup_result_title.winfo_toplevel().destroy()
 
     def test_anxiety_mode_opens_comparison_popup(self):
-        self.app.records.append({"data": "2026-09-16", "errori": 1})
+        self.app.records.append({"date": "2026-09-16", "errors": 1})
         self.app.analysis_mode_var.set('stress')
         self.app._toggle_anxiety_slider()
         self.app._run_unified_analysis()
@@ -253,32 +253,32 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.entry_date_var.set('16/09/2026')
         self.app.entry_errors_var.set(2)
         self.app._add_record()
-        self.assertEqual(load_records(self.storage_path), [{"data": "2026-09-16", "errori": 2}])
+        self.assertEqual(load_records(self.storage_path), [{"date": "2026-09-16", "errors": 2}])
 
         delete_button = next(child for child in self.app.records_list_frame.winfo_children()[1].winfo_children() if isinstance(child, tk.Button))
         delete_button.invoke()
         self.assertEqual(load_records(self.storage_path), [])
 
     def test_gui_reloads_saved_records(self):
-        save_records([{"data": "2026-09-15", "errori": 1}], self.storage_path)
+        save_records([{"date": "2026-09-15", "errors": 1}], self.storage_path)
         self.app.destroy()
         self.app = __import__('patente_gui', fromlist=['PatentApp']).PatentApp(storage_path=self.storage_path, settings_path=self.settings_path)
         self.app.update_idletasks()
-        self.assertEqual(self.app.records, [{"data": "2026-09-15", "errori": 1}])
+        self.assertEqual(self.app.records, [{"date": "2026-09-15", "errors": 1}])
 
     def test_gui_clear_all_is_persistent(self):
-        self.app.records.append({"data": "2026-09-15", "errori": 1})
+        self.app.records.append({"date": "2026-09-15", "errors": 1})
         self.app._persist_records()
         self.app._clear_records()
         self.assertEqual(load_records(self.storage_path), [])
 
     def test_record_list_scrolls_after_fifteen_entries(self):
-        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": day % 7} for day in range(1, 11)]
+        self.app.records = [{"date": f"2026-09-{day:02d}", "errors": day % 7} for day in range(1, 11)]
         self.app._refresh_record_list()
         self.app.update_idletasks()
         self.assertFalse(self.app.records_scrollbar.winfo_ismapped())
 
-        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": day % 7} for day in range(1, 17)]
+        self.app.records = [{"date": f"2026-09-{day:02d}", "errors": day % 7} for day in range(1, 17)]
         self.app._refresh_record_list()
         self.app.update_idletasks()
         bounds = self.app.records_canvas.bbox("all")
@@ -289,7 +289,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertNotIn("Rimuovi selezionato", visible_text)
 
     def test_graphics_keep_analysis_button_visible_at_startup(self):
-        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": 2} for day in range(1, 11)]
+        self.app.records = [{"date": f"2026-09-{day:02d}", "errors": 2} for day in range(1, 11)]
         self.app._refresh_record_list()
         tab = self.app.notebook.nametowidget(self.app.notebook.tabs()[0])
         content = tab.winfo_children()[0]
@@ -300,7 +300,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertGreaterEqual(self.app.winfo_height(), 820)
 
     def test_graphics_use_dark_scrollbar_and_red_delete_buttons(self):
-        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": 2} for day in range(1, 4)]
+        self.app.records = [{"date": f"2026-09-{day:02d}", "errors": 2} for day in range(1, 4)]
         self.app._refresh_record_list()
         rows = self.app.records_list_frame.winfo_children()[1:]
         delete_buttons = [row.winfo_children()[-1] for row in rows]

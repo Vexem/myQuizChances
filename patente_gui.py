@@ -10,9 +10,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from patente_core import (
-    analizza_predizione_records,
-    analizza_predizione_records_con_stress,
-    distribuzione_errori_records,
+    analyze_records,
+    analyze_records_with_anxiety,
+    error_distribution_from_records,
 )
 from patente_storage import StorageError, get_storage_path, load_records, load_settings, save_records, save_settings
 
@@ -50,7 +50,7 @@ class PatentApp(tk.Tk):
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
                 "waiting": "In attesa dei risultati", "start": "Avvia un'analisi per visualizzare una stima.",
                 "chart": "Distribuzione degli errori negli ultimi test", "errors": "Numero di errori", "occurrences": "Occorrenze", "no_chart": "Nessun grafico disponibile per questo file.",
-                "error": "Analisi non disponibile", "normal": "Scenario tranquillo", "stress_scenario": "Scenario ansia", "updated": "Aggiornato al", "analyzed": "Analizzati",
+                "error": "Analisi non disponibile", "error_title": "Errore", "normal": "Scenario tranquillo", "stress_scenario": "Scenario ansia", "updated": "Aggiornato al", "analyzed": "Analizzati",
                 "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "no_entries": "Inserisci almeno un risultato.",
                 "today": "Oggi", "previous_month": "Mese precedente", "next_month": "Mese successivo", "calendar": "Apri calendario",
                 "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
@@ -63,7 +63,7 @@ class PatentApp(tk.Tk):
                 "anxiety": "Anxiety multiplier", "anxiety_help": "1.0 means normal conditions; higher values simulate performance loss under stress.",
                 "waiting": "Waiting for results", "start": "Run an analysis to see an estimate.",
                 "chart": "Error distribution in recent tests", "errors": "Number of errors", "occurrences": "Occurrences", "no_chart": "No chart is available for this file.",
-                "error": "Analysis unavailable", "normal": "Calm scenario", "stress_scenario": "Anxiety scenario", "updated": "Updated on", "analyzed": "Analyzed",
+                "error": "Analysis unavailable", "error_title": "Error", "normal": "Calm scenario", "stress_scenario": "Anxiety scenario", "updated": "Updated on", "analyzed": "Analyzed",
                 "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "no_entries": "Add at least one result.",
                 "today": "Today", "previous_month": "Previous month", "next_month": "Next month", "calendar": "Open calendar",
                 "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
@@ -277,25 +277,25 @@ class PatentApp(tk.Tk):
         details_widget = getattr(self, f"{prefix}_result_details")
         if not isinstance(result, dict):
             title_widget.configure(text=self.t("error"), fg="#fca5a5")
-            probability_widget.configure(text="Errore", fg="#fca5a5")
+            probability_widget.configure(text=self.t("error_title"), fg="#fca5a5")
             details_widget.configure(text=str(result))
             return
         if not is_stress:
-            probability = result["prob_predittiva"]
+            probability = result["predicted_probability"]
             title = "Probabilità stimata di superamento" if self.language == "it" else "Estimated passing probability"
-            details = (f"{result['test_superati']} test su {result['test_analizzati']} entro la soglia di 3 errori\n"
-                       f"Errori attesi: {result['lambda_atteso']:.2f}  |  Storico positivo: {result['perc_storica']:.1f}%\n"
-                       f"{self.t('updated')} {result['data_riferimento']}  |  Emivita: {result['emivita']:.0f} giorni") if self.language == "it" else (f"{result['test_superati']} of {result['test_analizzati']} tests within the 3-error threshold\n"
-                       f"Expected errors: {result['lambda_atteso']:.2f}  |  Positive history: {result['perc_storica']:.1f}%\n"
-                       f"{self.t('updated')} {result['data_riferimento']}  |  Half-life: {result['emivita']:.0f} days")
+            details = (f"{result['passed_tests']} test su {result['tests_analyzed']} entro la soglia di 3 errori\n"
+                       f"Errori attesi: {result['expected_errors']:.2f}  |  Storico positivo: {result['historical_percentage']:.1f}%\n"
+                       f"{self.t('updated')} {result['reference_date']}  |  Emivita: {result['half_life']:.0f} giorni") if self.language == "it" else (f"{result['passed_tests']} of {result['tests_analyzed']} tests within the 3-error threshold\n"
+                       f"Expected errors: {result['expected_errors']:.2f}  |  Positive history: {result['historical_percentage']:.1f}%\n"
+                       f"{self.t('updated')} {result['reference_date']}  |  Half-life: {result['half_life']:.0f} days")
         else:
-            probability = result["prob_stress"]
+            probability = result["stress_probability"]
             title = "Probabilità stimata in condizioni di ansia" if self.language == "it" else "Estimated probability under anxiety"
-            details = (f"Scenario tranquillo: {result['prob_base']:.1f}%  |  Scenario ansia: {result['prob_stress']:.1f}%\n"
-                       f"Errori attesi: {result['lambda_base']:.2f}  ->  sotto stress: {result['lambda_stress']:.2f}\n"
-                       f"Analizzati {result['test_analizzati']} test, aggiornati al {result['data_rif']}") if self.language == "it" else (f"Calm scenario: {result['prob_base']:.1f}%  |  Anxiety scenario: {result['prob_stress']:.1f}%\n"
-                       f"Expected errors: {result['lambda_base']:.2f}  ->  under stress: {result['lambda_stress']:.2f}\n"
-                       f"{self.t('analyzed')} {result['test_analizzati']} tests, {self.t('updated').lower()} {result['data_rif']}")
+            details = (f"Scenario tranquillo: {result['base_probability']:.1f}%  |  Scenario ansia: {result['stress_probability']:.1f}%\n"
+                       f"Errori attesi: {result['base_expected_errors']:.2f}  ->  sotto stress: {result['stress_expected_errors']:.2f}\n"
+                       f"Analizzati {result['tests_analyzed']} test, aggiornati al {result['reference_date']}") if self.language == "it" else (f"Calm scenario: {result['base_probability']:.1f}%  |  Anxiety scenario: {result['stress_probability']:.1f}%\n"
+                       f"Expected errors: {result['base_expected_errors']:.2f}  ->  under stress: {result['stress_expected_errors']:.2f}\n"
+                       f"{self.t('analyzed')} {result['tests_analyzed']} tests, {self.t('updated').lower()} {result['reference_date']}")
         color = "#86efac" if probability >= 70 else "#fbbf24" if probability >= 50 else "#fca5a5"
         title_widget.configure(text=title, fg="#cbd5e1")
         probability_widget.configure(text=f"{probability:.1f}%", fg=color)
@@ -351,12 +351,12 @@ class PatentApp(tk.Tk):
         header.pack(fill="x")
         ttk.Label(header, text=self.t("entry_date"), style="Scale.TLabel", width=24).pack(side="left", padx=(8, 0))
         ttk.Label(header, text=self.t("entry_errors"), style="Scale.TLabel", width=18).pack(side="left")
-        for record in sorted(self.records, key=lambda value: value["data"]):
+        for record in sorted(self.records, key=lambda value: value["date"]):
             row = tk.Frame(self.records_list_frame, bg="#111c31")
             row.pack(fill="x", pady=1)
-            display_date = date.fromisoformat(record["data"]).strftime("%d/%m/%Y")
+            display_date = date.fromisoformat(record["date"]).strftime("%d/%m/%Y")
             tk.Label(row, text=display_date, bg="#111c31", fg="#dbeafe", width=24, anchor="w", padx=8, font=("Segoe UI", 9)).pack(side="left")
-            tk.Label(row, text=str(int(record["errori"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
+            tk.Label(row, text=str(int(record["errors"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
             tk.Button(row, text="×", command=lambda item=record: self._remove_record(item), bg="#ef4444", fg="#ffffff", activebackground="#f87171", activeforeground="#ffffff", relief="flat", bd=0, width=3, font=("Segoe UI", 10, "bold"), cursor="hand2").pack(side="right", padx=6)
         visible_rows = min(max(len(self.records), 1), 10)
         self.records_canvas.configure(height=36 + visible_rows * 28)
@@ -446,7 +446,7 @@ class PatentApp(tk.Tk):
             button.grid(row=row + 1, column=column, padx=1, pady=1)
 
     def _selected_records(self, count):
-        records = sorted(self.records, key=lambda value: value["data"])
+        records = sorted(self.records, key=lambda value: value["date"])
         return records[-int(count):]
 
     def _add_record(self):
@@ -455,15 +455,15 @@ class PatentApp(tk.Tk):
             parsed_date = datetime.strptime(data, "%d/%m/%Y").date()
             errors = int(self.entry_errors_var.get())
             if errors < 0:
-                raise ValueError("Il numero di errori non può essere negativo.")
-            record = {"data": parsed_date.isoformat(), "errori": errors}
+                raise ValueError("The number of errors cannot be negative.")
+            record = {"date": parsed_date.isoformat(), "errors": errors}
             self.records.append(record)
             if not self._persist_records():
                 self.records.pop()
                 return
             self._refresh_record_list()
         except ValueError as error:
-            messagebox.showerror("Errore", str(error))
+            messagebox.showerror(self.t("error_title"), str(error))
 
     def _remove_record(self, record):
         self.records.remove(record)
@@ -558,9 +558,9 @@ class PatentApp(tk.Tk):
     def _show_records_chart(self, container, records):
         self._clear_chart(container)
         try:
-            distribuzione = distribuzione_errori_records(records)
+            distribution = error_distribution_from_records(records)
             labels = ["0", "1", "2", "3", "4+"]
-            values = [distribuzione.get(0, 0), distribuzione.get(1, 0), distribuzione.get(2, 0), distribuzione.get(3, 0), distribuzione.get(4, 0)]
+            values = [distribution.get(0, 0), distribution.get(1, 0), distribution.get(2, 0), distribution.get(3, 0), distribution.get(4, 0)]
             fig = Figure(figsize=(5.8, 2.1), dpi=100, facecolor="#111827")
             ax = fig.add_subplot(111)
             ax.set_facecolor("#111827")
@@ -579,13 +579,13 @@ class PatentApp(tk.Tk):
         except Exception:
             ttk.Label(container, text=self.t("no_chart"), foreground="#fca5a5").pack(padx=12, pady=12)
 
-    def _open_analysis_popup(self, records, emivita_giorni, anxiety_enabled, anxiety_factor=1.2):
+    def _open_analysis_popup(self, records, half_life_days, anxiety_enabled, anxiety_factor=1.2):
         try:
             if anxiety_enabled:
-                result = analizza_predizione_records_con_stress(records, emivita_giorni, anxiety_factor)
+                result = analyze_records_with_anxiety(records, half_life_days, anxiety_factor)
                 mode = "popup_stress"
             else:
-                result = analizza_predizione_records(records, emivita_giorni=emivita_giorni)
+                result = analyze_records(records, half_life_days=half_life_days)
                 mode = "popup_base"
             popup = tk.Toplevel(self)
             popup.title(self.t("report"))
@@ -607,19 +607,19 @@ class PatentApp(tk.Tk):
             popup.geometry(f"{width}x{height}+{max(0, left)}+{max(0, top)}")
             popup.grab_set()
         except Exception as exc:
-            messagebox.showerror("Errore", str(exc))
+            messagebox.showerror(self.t("error_title"), str(exc))
             return None
 
     def _run_unified_analysis(self):
         try:
             n_test = int(self.n_test_var.get() or 50)
-            emivita = float(self.half_life_var.get() or 7.0)
+            half_life_days = float(self.half_life_var.get() or 7.0)
             records = self._selected_records(n_test)
             if not records:
                 raise ValueError(self.t("no_entries"))
-            self._open_analysis_popup(records, emivita, self.analysis_mode_var.get() == "stress", float(self.anxiety_factor_var.get()))
+            self._open_analysis_popup(records, half_life_days, self.analysis_mode_var.get() == "stress", float(self.anxiety_factor_var.get()))
         except Exception as exc:
-            messagebox.showerror("Errore", str(exc))
+            messagebox.showerror(self.t("error_title"), str(exc))
 
 
 if __name__ == "__main__":
