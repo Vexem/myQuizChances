@@ -17,6 +17,7 @@ Applicazione desktop per stimare la probabilita di superare l'esame di teoria de
 - Scelta del file Excel tramite finestra di dialogo.
 - Test automatici del motore e dei principali componenti GUI.
 - Eseguibile Windows generabile con PyInstaller.
+- Inserimento diretto dei risultati nell'app senza caricare file esterni.
 
 ## Requisiti
 
@@ -65,10 +66,29 @@ In alternativa, senza attivare l'ambiente:
 .\.venv\Scripts\python.exe patente_gui.py
 ```
 
-L'applicazione si apre con due schede:
+L'applicazione si apre con tre schede:
 
+- **Inserisci risultati**: registra i risultati della sessione direttamente nell'app.
 - **Base**: stima standard basata sugli errori registrati.
 - **Con ansia**: confronta lo scenario normale con uno scenario che simula maggiore difficolta.
+
+## Inserimento senza file
+
+La scheda **Inserisci risultati** e una proposta alternativa al caricamento di Excel pensata per essere compatibile anche con una futura app Android:
+
+1. inserisci la data del test;
+2. seleziona il numero di errori con la barra interattiva;
+3. premi **Aggiungi risultato**;
+4. ripeti per tutti i test della sessione;
+5. premi **Analizza risultati inseriti**.
+
+I record sono rappresentati internamente in forma semplice:
+
+```python
+{"data": "2026-09-16", "errori": 2}
+```
+
+Il motore di analisi riceve una lista di questi record tramite `analizza_predizione_records`. Questo separa l'inserimento dall'analisi: in futuro Android potra sostituire la schermata Tkinter mantenendo lo stesso contratto dati e lo stesso motore statistico. Nella versione attuale i record restano nella memoria della sessione e non vengono scritti o letti da file.
 
 ## Utilizzo della GUI
 
@@ -148,7 +168,7 @@ Il modello non considera fattori come stanchezza reale, difficolta specifica del
 
 ```text
 patente_gui.py             Interfaccia desktop Tkinter
-patente_core.py            Calcoli, caricamento Excel e distribuzione errori
+patente_core.py            Calcoli, record in memoria, Excel e distribuzione errori
 test_patente_core.py       Suite di test automatici
 AnalisiPatente.spec        Configurazione PyInstaller
 SCHEMA TEST PATENTE.xlsx   Dataset Excel predefinito

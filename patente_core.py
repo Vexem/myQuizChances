@@ -13,6 +13,7 @@ def _load_excel_rows(nome_file):
         raise FileNotFoundError(f"File non trovato: {nome_file}")
 
     df = pd.read_excel(path, header=None)
+
     if df.empty:
         raise ValueError("Il file Excel è vuoto.")
 
@@ -67,45 +68,87 @@ def _poisson_cdf_3(lam):
     return min(100.0, prob * 100)
 
 
+def _analizza_eventi(eventi, emivita_giorni):
+    if not eventi:
+        raise ValueError("Non ci sono risultati da analizzare.")
+    if emivita_giorni <= 0:
+        raise ValueError("L'emivita deve essere maggiore di zero.")
+
+    dati_strutturati = sorted(eventi, key=lambda x: x["data"])
+    data_riferimento = dati_strutturati[-1]["data"]
+    k = math.log(2) / emivita_giorni
+    pesi = []
+    errori = []
+    for item in dati_strutturati:
+        giorni_di_distanza = max(0, (data_riferimento - item["data"]).days)
+        pesi.append(math.exp(-k * giorni_di_distanza))
+        errori.append(float(item["errori"]))
+
+    pesi_norm = np.array(pesi, dtype=float) / np.sum(pesi)
+    errori_array = np.array(errori, dtype=float)
+    lambda_atteso = float(np.sum(errori_array * pesi_norm))
+    test_superati = int(sum(1 for errore in errori_array if errore <= SOGLIA_ERRORI))
+    return {
+        "test_analizzati": len(errori_array),
+        "data_riferimento": data_riferimento.strftime("%d/%m/%Y"),
+        "emivita": emivita_giorni,
+        "lambda_atteso": lambda_atteso,
+        "test_superati": test_superati,
+        "perc_storica": (test_superati / len(errori_array)) * 100,
+        "prob_predittiva": _poisson_cdf_3(lambda_atteso),
+    }
+
+
+def _normalizza_records(records):
+    eventi = []
+    for record in records:
+        data = pd.to_datetime(record["data"])
+        errori = float(record["errori"])
+        if errori < 0:
+            raise ValueError("Il numero di errori non può essere negativo.")
+        eventi.append({"data": data, "errori": errori})
+    return eventi
+
+
+def analizza_predizione_records(records, emivita_giorni=7.0):
+    """Analyze results already held by the application, without reading files."""
+    try:
+        return _analizza_eventi(_normalizza_records(records), emivita_giorni)
+    except Exception as error:
+        return f"Si è verificato un errore: {error}"
+
+
+def analizza_predizione_records_con_stress(records, emivita_giorni, moltiplicatore_ansia):
+    """Analyze in-memory results under normal and stress conditions."""
+    try:
+        base = _analizza_eventi(_normalizza_records(records), emivita_giorni)
+        lambda_base = base["lambda_atteso"]
+        lambda_stress = lambda_base * moltiplicatore_ansia
+        return {
+            "test_analizzati": base["test_analizzati"],
+            "data_rif": base["data_riferimento"],
+            "lambda_base": lambda_base,
+            "lambda_stress": lambda_stress,
+            "prob_base": _poisson_cdf_3(lambda_base),
+            "prob_stress": _poisson_cdf_3(lambda_stress),
+        }
+    except Exception as error:
+        return f"Errore durante il calcolo: {error}"
+
+
+def distribuzione_errori_records(records):
+    distribuzione = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+    for record in _normalizza_records(records):
+        errore = int(record["errori"])
+        distribuzione[min(errore, 4)] += 1
+    return distribuzione
+
+
 def analizza_predizione_patente(nome_file, n_test_da_analizzare=9999, emivita_giorni=7.0):
     try:
         dati = _load_excel_rows(nome_file)
         eventi = _estrai_ultimi_test(dati, n_test_da_analizzare)
-        if not eventi:
-            return "Non ci sono test validi nel file."
-
-        dati_strutturati = sorted(eventi, key=lambda x: x["data"])
-        data_odierna = dati_strutturati[-1]["data"]
-        k = math.log(2) / emivita_giorni
-
-        pesi = []
-        errori = []
-        for item in dati_strutturati:
-            giorni_di_distanza = max(0, (data_odierna - item["data"]).days)
-            peso = math.exp(-k * giorni_di_distanza)
-            pesi.append(peso)
-            errori.append(item["errori"])
-
-        if not pesi or sum(pesi) == 0:
-            return "I pesi calcolati sono tutti nulli. Verifica i dati o il valore dell'emivita."
-
-        pesi_norm = np.array(pesi, dtype=float) / np.sum(pesi)
-        errori_array = np.array(errori, dtype=float)
-        lambda_atteso = float(np.sum(errori_array * pesi_norm))
-
-        prob_predittiva_poisson = _poisson_cdf_3(lambda_atteso)
-        test_superati = int(sum(1 for e in errori_array if e <= SOGLIA_ERRORI))
-        perc_storica = (test_superati / len(errori_array)) * 100
-
-        return {
-            "test_analizzati": len(errori_array),
-            "data_riferimento": data_odierna.strftime("%d/%m/%Y"),
-            "emivita": emivita_giorni,
-            "lambda_atteso": lambda_atteso,
-            "test_superati": test_superati,
-            "perc_storica": perc_storica,
-            "prob_predittiva": prob_predittiva_poisson,
-        }
+        return _analizza_eventi(eventi, emivita_giorni)
     except Exception as e:
         return f"Si è verificato un errore: {e}"
 

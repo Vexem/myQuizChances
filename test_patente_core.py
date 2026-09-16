@@ -8,8 +8,11 @@ import pandas as pd
 
 from patente_core import (
     analizza_predizione_patente,
+    analizza_predizione_records,
+    analizza_predizione_records_con_stress,
     analizza_predizione_patente_con_stress,
     distribuzione_errori,
+    distribuzione_errori_records,
 )
 
 
@@ -106,6 +109,29 @@ class PatentCoreTestCase(unittest.TestCase):
         self.assertIsInstance(result, str)
         self.assertIn('errore', result.lower())
 
+    def test_in_memory_records_match_file_style_analysis(self):
+        records = [
+            {"data": "2024-01-01", "errori": 2},
+            {"data": "2024-01-02", "errori": 0},
+            {"data": "2024-01-03", "errori": 4},
+        ]
+        result = analizza_predizione_records(records, emivita_giorni=7)
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['test_analizzati'], 3)
+        self.assertEqual(result['data_riferimento'], '03/01/2024')
+
+    def test_in_memory_stress_and_distribution(self):
+        records = [
+            {"data": "2024-01-01", "errori": 0},
+            {"data": "2024-01-02", "errori": 4},
+        ]
+        stress = analizza_predizione_records_con_stress(records, 7, 1.2)
+        distribution = distribuzione_errori_records(records)
+
+        self.assertLess(stress['prob_stress'], stress['prob_base'])
+        self.assertEqual(distribution, {0: 1, 1: 0, 2: 0, 3: 0, 4: 1})
+
 
 class PatentGuiTestCase(unittest.TestCase):
     def setUp(self):
@@ -129,7 +155,7 @@ class PatentGuiTestCase(unittest.TestCase):
 
         visit(self.app)
         scales = [widget for widget in widgets if isinstance(widget, tk.Scale)]
-        self.assertEqual(len(scales), 5)
+        self.assertEqual(len(scales), 6)
         self.assertEqual(scales[-1].cget('resolution'), 0.1)
         self.assertEqual(self.app.language_menu.index('end') + 1, 2)
 
@@ -137,8 +163,9 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.language_menu.invoke(1)
         self.app.update_idletasks()
         self.assertEqual(self.app.language, 'en')
-        self.assertEqual(self.app.notebook.tab(0, 'text'), 'Standard')
-        self.assertEqual(self.app.notebook.tab(1, 'text'), 'With anxiety')
+        self.assertEqual(self.app.notebook.tab(0, 'text'), 'Enter results')
+        self.assertEqual(self.app.notebook.tab(1, 'text'), 'Standard')
+        self.assertEqual(self.app.notebook.tab(2, 'text'), 'With anxiety')
 
 
 if __name__ == '__main__':
