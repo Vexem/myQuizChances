@@ -167,6 +167,15 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertEqual(self.app.notebook.tab(1, 'text'), 'Standard')
         self.assertEqual(self.app.notebook.tab(2, 'text'), 'With anxiety')
 
+    def test_gui_date_picker_selects_date(self):
+        from datetime import date
+
+        self.app._open_date_picker()
+        self.app.update_idletasks()
+        self.assertTrue(self.app.date_picker.winfo_exists())
+        self.app._select_calendar_date(date(2026, 9, 20))
+        self.assertEqual(self.app.entry_date_var.get(), '2026-09-20')
+
 
 if __name__ == '__main__':
     unittest.main()

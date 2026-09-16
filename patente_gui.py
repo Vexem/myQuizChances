@@ -1,4 +1,5 @@
 import os
+import calendar
 import tkinter as tk
 from datetime import date
 from pathlib import Path
@@ -37,6 +38,7 @@ class PatentApp(tk.Tk):
                 "chart": "Distribuzione degli errori negli ultimi test", "errors": "Numero di errori", "occurrences": "Occorrenze", "no_chart": "Nessun grafico disponibile per questo file.",
                 "error": "Analisi non disponibile", "normal": "Scenario tranquillo", "stress_scenario": "Scenario ansia", "updated": "Aggiornato al", "analyzed": "Analizzati",
                 "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "saved_results": "Risultati inseriti", "no_entries": "Inserisci almeno un risultato.",
+                "today": "Oggi", "previous_month": "Mese precedente", "next_month": "Mese successivo", "calendar": "Apri calendario",
                 "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
             },
             "en": {
@@ -48,6 +50,7 @@ class PatentApp(tk.Tk):
                 "chart": "Error distribution in recent tests", "errors": "Number of errors", "occurrences": "Occurrences", "no_chart": "No chart is available for this file.",
                 "error": "Analysis unavailable", "normal": "Calm scenario", "stress_scenario": "Anxiety scenario", "updated": "Updated on", "analyzed": "Analyzed",
                 "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "saved_results": "Entered results", "no_entries": "Add at least one result.",
+                "today": "Today", "previous_month": "Previous month", "next_month": "Next month", "calendar": "Open calendar",
                 "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
             },
         }
@@ -261,7 +264,14 @@ class PatentApp(tk.Tk):
         self.entry_half_life_var = tk.DoubleVar(value=7)
 
         ttk.Label(frame, text=self.t("entry_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
-        self._field_block(frame, self.t("entry_date"), "YYYY-MM-DD", self.entry_date_var, row=1, width=20)
+        ttk.Label(frame, text=self.t("entry_date"), font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 4))
+        ttk.Label(frame, text="YYYY-MM-DD", style="Info.TLabel").grid(row=2, column=0, sticky="w", pady=(0, 8))
+        date_controls = ttk.Frame(frame)
+        date_controls.grid(row=3, column=0, sticky="w")
+        self.entry_date_display = ttk.Entry(date_controls, textvariable=self.entry_date_var, state="readonly", width=18)
+        self.entry_date_display.pack(side="left", padx=(0, 8))
+        self.calendar_button = ttk.Button(date_controls, text="📅", width=3, command=self._open_date_picker)
+        self.calendar_button.pack(side="left")
         self._slider_block(frame, self.t("entry_errors"), "0 = nessun errore; 12 = molti errori.", self.entry_errors_var, row=4, minimum=0, maximum=12, formatter=lambda value: f"{float(value):.0f}")
 
         actions = ttk.Frame(frame)
@@ -292,6 +302,70 @@ class PatentApp(tk.Tk):
         for record in sorted(self.records, key=lambda value: value["data"]):
             self.entry_tree.insert("", "end", values=(record["data"], int(record["errori"])))
         self._update_session_labels()
+
+    def _open_date_picker(self):
+        if hasattr(self, "date_picker") and self.date_picker.winfo_exists():
+            self.date_picker.focus_force()
+            return
+
+        try:
+            selected_date = date.fromisoformat(self.entry_date_var.get())
+        except ValueError:
+            selected_date = date.today()
+
+        self.calendar_year = selected_date.year
+        self.calendar_month = selected_date.month
+        self.calendar_selected = selected_date
+        self.date_picker = tk.Toplevel(self)
+        self.date_picker.title(self.t("entry_date"))
+        self.date_picker.configure(bg="#0b1220")
+        self.date_picker.resizable(False, False)
+        self.date_picker.transient(self)
+        self.date_picker.grab_set()
+
+        header = tk.Frame(self.date_picker, bg="#111c31")
+        header.pack(fill="x", padx=10, pady=(10, 6))
+        tk.Button(header, text="‹", command=lambda: self._change_calendar_month(-1), bg="#111c31", fg="#67e8f9", activebackground="#263653", activeforeground="#ffffff", relief="flat", bd=0, font=("Segoe UI", 15, "bold"), width=3).pack(side="left")
+        self.calendar_title = tk.Label(header, bg="#111c31", fg="#f8fafc", font=("Segoe UI", 10, "bold"), width=18)
+        self.calendar_title.pack(side="left", expand=True)
+        tk.Button(header, text="›", command=lambda: self._change_calendar_month(1), bg="#111c31", fg="#67e8f9", activebackground="#263653", activeforeground="#ffffff", relief="flat", bd=0, font=("Segoe UI", 15, "bold"), width=3).pack(side="right")
+
+        self.calendar_grid = tk.Frame(self.date_picker, bg="#0b1220")
+        self.calendar_grid.pack(padx=10, pady=(0, 6))
+        ttk.Button(self.date_picker, text=self.t("today"), command=lambda: self._select_calendar_date(date.today())).pack(pady=(0, 10))
+        self._render_calendar()
+
+    def _change_calendar_month(self, offset):
+        month_index = self.calendar_year * 12 + self.calendar_month - 1 + offset
+        self.calendar_year, month_zero = divmod(month_index, 12)
+        self.calendar_month = month_zero + 1
+        self._render_calendar()
+
+    def _select_calendar_date(self, selected_date):
+        self.entry_date_var.set(selected_date.isoformat())
+        if hasattr(self, "date_picker") and self.date_picker.winfo_exists():
+            self.date_picker.grab_release()
+            self.date_picker.destroy()
+
+    def _render_calendar(self):
+        for child in self.calendar_grid.winfo_children():
+            child.destroy()
+        month_names = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
+        if self.language == "en":
+            month_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        self.calendar_title.configure(text=f"{month_names[self.calendar_month - 1]} {self.calendar_year}")
+        weekdays = ["L", "M", "M", "G", "V", "S", "D"] if self.language == "it" else ["M", "T", "W", "T", "F", "S", "S"]
+        for column, weekday in enumerate(weekdays):
+            tk.Label(self.calendar_grid, text=weekday, bg="#0b1220", fg="#64748b", font=("Segoe UI", 8, "bold"), width=4).grid(row=0, column=column, pady=(0, 4))
+        month_days = calendar.monthrange(self.calendar_year, self.calendar_month)[1]
+        first_weekday = date(self.calendar_year, self.calendar_month, 1).weekday()
+        for day_number in range(1, month_days + 1):
+            position = first_weekday + day_number - 1
+            row, column = divmod(position, 7)
+            current = date(self.calendar_year, self.calendar_month, day_number)
+            selected = current == self.calendar_selected
+            button = tk.Button(self.calendar_grid, text=str(day_number), command=lambda value=current: self._select_calendar_date(value), width=4, relief="flat", bd=0, bg="#38bdf8" if selected else "#162033", fg="#07111f" if selected else "#dbeafe", activebackground="#7dd3fc", activeforeground="#07111f", font=("Segoe UI", 9, "bold" if selected else "normal"))
+            button.grid(row=row + 1, column=column, padx=1, pady=1)
 
     def _selected_records(self, count):
         records = sorted(self.records, key=lambda value: value["data"])

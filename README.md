@@ -11,6 +11,7 @@ Applicazione desktop per stimare la probabilita di superare l'esame di teoria de
 - Modello di Poisson con soglia di superamento impostata a 3 errori.
 - Scenario con ansia tramite moltiplicatore delle difficolta.
 - Selezione dei parametri tramite barre interattive.
+- Selezione della data tramite calendario popup interno.
 - Grafico della distribuzione degli errori.
 - Interfaccia in italiano e inglese.
 - Selettore lingua con icone delle bandiere.
@@ -82,6 +83,8 @@ La scheda **Inserisci risultati** e una proposta alternativa al caricamento di E
 3. premi **Aggiungi risultato**;
 4. ripeti per tutti i test della sessione;
 5. premi **Analizza risultati inseriti**.
+
+La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo non accetta testo libero, così il formato resta sempre coerente (`YYYY-MM-DD`).
 
 I record sono rappresentati internamente in forma semplice:
 
