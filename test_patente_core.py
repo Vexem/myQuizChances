@@ -218,7 +218,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertLess(abs(self.app.date_picker.winfo_rootx() + self.app.date_picker.winfo_width() / 2 - (self.app.winfo_rootx() + self.app.winfo_width() / 2)), 2)
         self.assertLess(abs(self.app.date_picker.winfo_rooty() + self.app.date_picker.winfo_height() / 2 - (self.app.winfo_rooty() + self.app.winfo_height() / 2)), 2)
         self.app._select_calendar_date(date(2026, 9, 20))
-        self.assertEqual(self.app.entry_date_var.get(), '2026-09-20')
+        self.assertEqual(self.app.entry_date_var.get(), '20/09/2026')
 
     def test_gui_uses_correct_result_wording(self):
         records = [{"data": "2026-09-16", "errori": 1}]
@@ -247,7 +247,7 @@ class PatentGuiTestCase(unittest.TestCase):
         self.assertEqual(anxiety_scales[0].cget('state'), 'normal')
 
     def test_gui_persists_and_deletes_single_record(self):
-        self.app.entry_date_var.set('2026-09-16')
+        self.app.entry_date_var.set('16/09/2026')
         self.app.entry_errors_var.set(2)
         self.app._add_record()
         self.assertEqual(load_records(self.storage_path), [{"data": "2026-09-16", "errori": 2}])
@@ -268,6 +268,16 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app._persist_records()
         self.app._clear_records()
         self.assertEqual(load_records(self.storage_path), [])
+
+    def test_record_list_scrolls_after_fifteen_entries(self):
+        self.app.records = [{"data": f"2026-09-{day:02d}", "errori": day % 7} for day in range(1, 17)]
+        self.app._refresh_record_list()
+        self.app.update_idletasks()
+        bounds = self.app.records_canvas.bbox("all")
+        self.assertIsNotNone(bounds)
+        self.assertGreater(bounds[3] - bounds[1], self.app.records_canvas.winfo_height())
+        visible_text = [child.cget("text") for child in self.app.records_list_frame.winfo_children()[0].winfo_children()]
+        self.assertNotIn("Rimuovi selezionato", visible_text)
 
     def test_gui_persists_settings_for_next_start(self):
         self.app.n_test_var.set(80)

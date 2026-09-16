@@ -95,7 +95,7 @@ Nella scheda **Impostazioni** / **Settings** puoi scegliere:
 
 Il pulsante **Analizza risultati inseriti** resta nella scheda Inserisci risultati e apre il report in un popup dedicato.
 
-La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo non accetta testo libero, così il formato resta sempre coerente (`YYYY-MM-DD`).
+La data si seleziona dal pulsante calendario: puoi cambiare mese con le frecce, scegliere un giorno oppure usare il pulsante **Oggi**. Il campo mostra il formato italiano `GG/MM/AAAA`; internamente il valore viene normalizzato in `YYYY-MM-DD` per storage e calcoli.
 
 I record sono rappresentati internamente in forma semplice:
 

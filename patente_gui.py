@@ -1,7 +1,7 @@
 import os
 import calendar
 import tkinter as tk
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 
@@ -304,7 +304,7 @@ class PatentApp(tk.Tk):
         frame.place(relx=0.5, rely=0.02, relwidth=0.78, anchor="n")
         frame.columnconfigure(0, weight=1)
 
-        self.entry_date_var = tk.StringVar(value=date.today().isoformat())
+        self.entry_date_var = tk.StringVar(value=date.today().strftime("%d/%m/%Y"))
         self.entry_errors_var = tk.DoubleVar(value=0)
 
         ttk.Label(frame, text=self.t("entry_help"), style="Info.TLabel", wraplength=760).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
@@ -321,11 +321,20 @@ class PatentApp(tk.Tk):
         actions = ttk.Frame(frame)
         actions.grid(row=8, column=0, sticky="w", pady=(14, 8))
         ttk.Button(actions, text=self.t("add"), command=self._add_record).pack(side="left", padx=(0, 8))
-        ttk.Button(actions, text=self.t("remove"), command=self._remove_record).pack(side="left", padx=(0, 8))
         ttk.Button(actions, text=self.t("clear"), command=self._clear_records).pack(side="left")
 
-        self.records_list_frame = ttk.Frame(frame)
-        self.records_list_frame.grid(row=9, column=0, sticky="ew", pady=(0, 10))
+        list_container = ttk.Frame(frame)
+        list_container.grid(row=9, column=0, sticky="ew", pady=(0, 10))
+        list_container.columnconfigure(0, weight=1)
+        self.records_canvas = tk.Canvas(list_container, bg="#0b1220", highlightthickness=0, height=240)
+        self.records_canvas.grid(row=0, column=0, sticky="ew")
+        self.records_scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.records_canvas.yview)
+        self.records_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.records_canvas.configure(yscrollcommand=self.records_scrollbar.set)
+        self.records_list_frame = ttk.Frame(self.records_canvas)
+        self.records_window = self.records_canvas.create_window((0, 0), window=self.records_list_frame, anchor="nw")
+        self.records_list_frame.bind("<Configure>", lambda _event: self.records_canvas.configure(scrollregion=self.records_canvas.bbox("all")))
+        self.records_canvas.bind("<Configure>", lambda event: self.records_canvas.itemconfigure(self.records_window, width=event.width))
         self._refresh_record_list()
 
         ttk.Button(frame, text=self.t("analyze_entries"), command=self._open_entry_analysis).grid(row=10, column=0, sticky="w", pady=(4, 8))
@@ -342,9 +351,11 @@ class PatentApp(tk.Tk):
         for record in sorted(self.records, key=lambda value: value["data"]):
             row = tk.Frame(self.records_list_frame, bg="#111c31")
             row.pack(fill="x", pady=1)
-            tk.Label(row, text=record["data"], bg="#111c31", fg="#dbeafe", width=24, anchor="w", padx=8, font=("Segoe UI", 9)).pack(side="left")
+            display_date = date.fromisoformat(record["data"]).strftime("%d/%m/%Y")
+            tk.Label(row, text=display_date, bg="#111c31", fg="#dbeafe", width=24, anchor="w", padx=8, font=("Segoe UI", 9)).pack(side="left")
             tk.Label(row, text=str(int(record["errori"])), bg="#111c31", fg="#dbeafe", width=18, anchor="w", font=("Segoe UI", 9)).pack(side="left")
             tk.Button(row, text="×", command=lambda item=record: self._remove_record(item), bg="#ef4444", fg="#ffffff", activebackground="#f87171", activeforeground="#ffffff", relief="flat", bd=0, width=3, font=("Segoe UI", 10, "bold"), cursor="hand2").pack(side="right", padx=6)
+        self.records_canvas.configure(scrollregion=self.records_canvas.bbox("all"))
         self._update_session_labels()
 
     def _open_date_picker(self):
@@ -353,7 +364,7 @@ class PatentApp(tk.Tk):
             return
 
         try:
-            selected_date = date.fromisoformat(self.entry_date_var.get())
+            selected_date = datetime.strptime(self.entry_date_var.get(), "%d/%m/%Y").date()
         except ValueError:
             selected_date = date.today()
 
@@ -400,7 +411,7 @@ class PatentApp(tk.Tk):
         self._render_calendar()
 
     def _select_calendar_date(self, selected_date):
-        self.entry_date_var.set(selected_date.isoformat())
+        self.entry_date_var.set(selected_date.strftime("%d/%m/%Y"))
         if hasattr(self, "date_picker") and self.date_picker.winfo_exists():
             self.date_picker.grab_release()
             self.date_picker.destroy()
@@ -432,7 +443,7 @@ class PatentApp(tk.Tk):
     def _add_record(self):
         try:
             data = self.entry_date_var.get().strip()
-            parsed_date = date.fromisoformat(data)
+            parsed_date = datetime.strptime(data, "%d/%m/%Y").date()
             errors = int(self.entry_errors_var.get())
             if errors < 0:
                 raise ValueError("Il numero di errori non può essere negativo.")
