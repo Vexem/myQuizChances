@@ -14,10 +14,11 @@ from patente_core import (
     analizza_predizione_records_con_stress,
     distribuzione_errori_records,
 )
+from patente_storage import StorageError, get_storage_path, load_records, save_records
 
 
 class PatentApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, storage_path=None):
         super().__init__()
         self.title("Analisi Patente")
         self.geometry("900x680")
@@ -26,34 +27,40 @@ class PatentApp(tk.Tk):
         self._center_window()
         self.after(100, self._focus_window)
 
-        self.records = []
+        self.storage_path = Path(storage_path) if storage_path is not None else get_storage_path()
+        self.storage_error = None
+        try:
+            self.records = load_records(self.storage_path)
+        except StorageError as error:
+            self.records = []
+            self.storage_error = error
         self.language = "it"
         self.translations = {
             "it": {
-                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "settings": "Importazioni", "stress": "Con ansia", "english": "English",
+                "title": "Analisi probabilistica esame patente", "entry": "Inserisci risultati", "settings": "Importazioni", "english": "English",
                 "tests": "Numero di test da considerare", "tests_help": "Più alto è il numero, più lo storico è ampio. Il valore indica quanti test recenti includere.",
                 "half": "Emivita in giorni", "half_help": "Indica dopo quanti giorni un test vecchio perde metà della sua rilevanza. Valori bassi privilegiano i test recenti.",
                 "anxiety": "Moltiplicatore ansia", "anxiety_help": "1.0 indica condizioni normali; valori superiori simulano un peggioramento delle prestazioni sotto stress.",
-                "calculate": "Calcola probabilità", "calculate_stress": "Calcola con ansia", "waiting": "In attesa dei risultati", "start": "Avvia un'analisi per visualizzare una stima.",
+                "waiting": "In attesa dei risultati", "start": "Avvia un'analisi per visualizzare una stima.",
                 "chart": "Distribuzione degli errori negli ultimi test", "errors": "Numero di errori", "occurrences": "Occorrenze", "no_chart": "Nessun grafico disponibile per questo file.",
                 "error": "Analisi non disponibile", "normal": "Scenario tranquillo", "stress_scenario": "Scenario ansia", "updated": "Aggiornato al", "analyzed": "Analizzati",
-                "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "saved_results": "Risultati inseriti", "no_entries": "Inserisci almeno un risultato.",
+                "entry_date": "Data del test", "entry_errors": "Errori commessi", "add": "Aggiungi risultato", "remove": "Rimuovi selezionato", "clear": "Svuota elenco", "analyze_entries": "Analizza risultati inseriti", "entry_help": "I risultati restano nell'app durante questa sessione e non richiedono file esterni.", "no_entries": "Inserisci almeno un risultato.",
                 "today": "Oggi", "previous_month": "Mese precedente", "next_month": "Mese successivo", "calendar": "Apri calendario",
                 "session_help": "Queste analisi usano i risultati inseriti nella scheda Inserisci risultati.", "session_count": "risultati disponibili", "go_to_entry": "Vai a Inserisci risultati",
-                "analysis_mode": "Valutazione ansia", "without_anxiety": "Senza ansia", "with_anxiety": "Con ansia", "close": "Chiudi", "report": "Report analisi",
+                "analysis_mode": "Valutazione ansia", "without_anxiety": "Senza ansia", "with_anxiety": "Con ansia", "close": "Chiudi", "report": "Report analisi", "storage_error": "Impossibile leggere o salvare i risultati locali.",
             },
             "en": {
-                "title": "Driving test probability analysis", "entry": "Enter results", "settings": "Settings", "stress": "With anxiety", "english": "Italiano",
+                "title": "Driving test probability analysis", "entry": "Enter results", "settings": "Settings", "english": "Italiano",
                 "tests": "Number of tests to include", "tests_help": "A higher number gives a broader history. This is the number of recent tests included.",
                 "half": "Half-life in days", "half_help": "After this many days, an old test has half its relevance. Lower values favor recent tests.",
                 "anxiety": "Anxiety multiplier", "anxiety_help": "1.0 means normal conditions; higher values simulate performance loss under stress.",
-                "calculate": "Calculate probability", "calculate_stress": "Calculate with anxiety", "waiting": "Waiting for results", "start": "Run an analysis to see an estimate.",
+                "waiting": "Waiting for results", "start": "Run an analysis to see an estimate.",
                 "chart": "Error distribution in recent tests", "errors": "Number of errors", "occurrences": "Occurrences", "no_chart": "No chart is available for this file.",
                 "error": "Analysis unavailable", "normal": "Calm scenario", "stress_scenario": "Anxiety scenario", "updated": "Updated on", "analyzed": "Analyzed",
-                "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "saved_results": "Entered results", "no_entries": "Add at least one result.",
+                "entry_date": "Test date", "entry_errors": "Mistakes made", "add": "Add result", "remove": "Remove selected", "clear": "Clear list", "analyze_entries": "Analyze entered results", "entry_help": "Results stay inside the app during this session and do not require external files.", "no_entries": "Add at least one result.",
                 "today": "Today", "previous_month": "Previous month", "next_month": "Next month", "calendar": "Open calendar",
                 "session_help": "These analyses use the results entered in the Enter results tab.", "session_count": "results available", "go_to_entry": "Go to Enter results",
-                "analysis_mode": "Anxiety evaluation", "without_anxiety": "Without anxiety", "with_anxiety": "With anxiety", "close": "Close", "report": "Analysis report",
+                "analysis_mode": "Anxiety evaluation", "without_anxiety": "Without anxiety", "with_anxiety": "With anxiety", "close": "Close", "report": "Analysis report", "storage_error": "Unable to read or save local results.",
             },
         }
         self._apply_theme()
@@ -84,6 +91,8 @@ class PatentApp(tk.Tk):
 
         self._build_entry_tab()
         self._build_base_tab()
+        if self.storage_error is not None:
+            self.after_idle(self._show_storage_error)
 
     def t(self, key):
         return self.translations[self.language][key]
@@ -131,6 +140,17 @@ class PatentApp(tk.Tk):
         self._build_entry_tab()
         self._build_base_tab()
 
+    def _show_storage_error(self):
+        messagebox.showerror(self.t("storage_error"), str(self.storage_error))
+
+    def _persist_records(self):
+        try:
+            save_records(self.records, self.storage_path)
+            return True
+        except StorageError as error:
+            messagebox.showerror(self.t("storage_error"), str(error))
+            return False
+
     def _center_window(self):
         self.update_idletasks()
         width = 900
@@ -171,15 +191,6 @@ class PatentApp(tk.Tk):
         style.configure("Treeview", background="#111c31", foreground="#dbeafe", fieldbackground="#111c31", rowheight=27, borderwidth=0, font=("Segoe UI", 9))
         style.configure("Treeview.Heading", background="#1e293b", foreground="#e2e8f0", relief="flat", font=("Segoe UI", 9, "bold"))
         style.map("Treeview", background=[("selected", "#38bdf8")], foreground=[("selected", "#07111f")])
-
-    def _field_block(self, parent, label_text, help_text, variable, row, width=60, button=None):
-        ttk.Label(parent, text=label_text, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", pady=(12, 4))
-        ttk.Label(parent, text=help_text, style="Info.TLabel", wraplength=760).grid(row=row + 1, column=0, sticky="w", pady=(0, 8))
-        entry = ttk.Entry(parent, textvariable=variable, width=width)
-        entry.grid(row=row + 2, column=0, sticky="ew", padx=(0, 10))
-        if button is not None:
-            button.grid(row=row + 2, column=1, sticky="w")
-        parent.columnconfigure(0, weight=1)
 
     def _slider_block(self, parent, label_text, help_text, variable, row, minimum, maximum, formatter=str, step=1):
         ttk.Label(parent, text=label_text, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", pady=(12, 4))
@@ -392,7 +403,11 @@ class PatentApp(tk.Tk):
             errors = int(self.entry_errors_var.get())
             if errors < 0:
                 raise ValueError("Il numero di errori non può essere negativo.")
-            self.records.append({"data": parsed_date.isoformat(), "errori": errors})
+            record = {"data": parsed_date.isoformat(), "errori": errors}
+            self.records.append(record)
+            if not self._persist_records():
+                self.records.pop()
+                return
             self._refresh_record_list()
         except ValueError as error:
             messagebox.showerror("Errore", str(error))
@@ -402,11 +417,19 @@ class PatentApp(tk.Tk):
         if not selected:
             return
         values = self.entry_tree.item(selected[0], "values")
-        self.records.remove({"data": values[0], "errori": int(values[1])})
+        record = {"data": values[0], "errori": int(values[1])}
+        self.records.remove(record)
+        if not self._persist_records():
+            self.records.append(record)
+            return
         self._refresh_record_list()
 
     def _clear_records(self):
+        previous_records = self.records[:]
         self.records.clear()
+        if not self._persist_records():
+            self.records.extend(previous_records)
+            return
         self._refresh_record_list()
 
     def _open_entry_analysis(self):
@@ -475,34 +498,6 @@ class PatentApp(tk.Tk):
                 widget.configure(state=state)
             elif isinstance(widget, ttk.Label):
                 widget.configure(foreground=value_foreground if widget.cget("style") == "Value.TLabel" else foreground)
-
-    def _format_result(self, result):
-        if isinstance(result, dict):
-            text = [
-                "RISULTATO ANALISI",
-                "=" * 60,
-                f"Test analizzati: {result.get('test_analizzati', 0)}",
-                f"Data riferimento: {result.get('data_riferimento') or result.get('data_rif', '-')}",
-            ]
-            if 'emivita' in result:
-                text.append(f"Emivita: {result['emivita']} giorni")
-            if 'lambda_atteso' in result:
-                text.append(f"Lambda atteso: {result['lambda_atteso']:.2f}")
-                text.append(f"Storico superati: {result['test_superati']} ({result['perc_storica']:.1f}%)")
-                text.append(f"Probabilità di promozione: {result['prob_predittiva']:.1f}%")
-            if 'lambda_base' in result:
-                text.append(f"Lambda base: {result['lambda_base']:.2f}")
-                text.append(f"Lambda stress: {result['lambda_stress']:.2f}")
-                text.append(f"Promozione tranquilla: {result['prob_base']:.1f}%")
-                text.append(f"Promozione con ansia: {result['prob_stress']:.1f}%")
-            return "\n".join(text)
-        return str(result)
-
-    def _set_text(self, widget, value):
-        widget.configure(state="normal")
-        widget.delete("1.0", tk.END)
-        widget.insert(tk.END, value)
-        widget.configure(state="disabled")
 
     def _clear_chart(self, container):
         for child in container.winfo_children():

@@ -18,6 +18,9 @@ Applicazione desktop per stimare la probabilita di superare l'esame di teoria de
 - Test automatici del motore e dei principali componenti GUI.
 - Eseguibile Windows generabile con PyInstaller.
 - Inserimento diretto dei risultati nell'app senza caricare file esterni.
+- Salvataggio automatico locale dopo ogni modifica.
+- Ripristino automatico dei risultati all'avvio.
+- Cancellazione manuale di una singola entry o dell'intero elenco.
 
 ## Requisiti
 
@@ -98,7 +101,19 @@ I record sono rappresentati internamente in forma semplice:
 {"data": "2026-09-16", "errori": 2}
 ```
 
-Il motore di analisi riceve una lista di questi record tramite `analizza_predizione_records`. Questo separa l'inserimento dall'analisi: in futuro Android potra sostituire la schermata Tkinter mantenendo lo stesso contratto dati e lo stesso motore statistico. Nella versione attuale i record restano nella memoria della sessione e non vengono scritti o letti da file.
+Il motore di analisi riceve una lista di questi record tramite `analizza_predizione_records`. Questo separa l'inserimento dall'analisi: in futuro Android potra sostituire la schermata Tkinter mantenendo lo stesso contratto dati e lo stesso motore statistico. Durante l'esecuzione i record restano in memoria e vengono sincronizzati automaticamente con lo storage locale.
+
+### Persistenza locale
+
+I record non vengono persi chiudendo l'applicazione. Dopo ogni aggiunta, cancellazione singola o svuotamento dell'elenco, l'app salva automaticamente i dati in JSON:
+
+```text
+%LOCALAPPDATA%\AnalisiPatente\records.json
+```
+
+Il salvataggio usa un file temporaneo e una sostituzione atomica, per evitare di lasciare un archivio parzialmente scritto in caso di interruzione. All'avvio il file viene ricaricato automaticamente. Se il contenuto non e leggibile, l'app mostra un errore e non sovrascrive il file danneggiato.
+
+La cancellazione e sempre esplicita: **Rimuovi selezionato** elimina una sola entry, mentre **Svuota elenco** elimina tutti i risultati salvati.
 
 ## Utilizzo della GUI
 
@@ -179,6 +194,7 @@ Il modello non considera fattori come stanchezza reale, difficolta specifica del
 ```text
 patente_gui.py             Interfaccia desktop Tkinter
 patente_core.py            Calcoli, record in memoria, Excel e distribuzione errori
+patente_storage.py         Persistenza locale atomica dei record
 test_patente_core.py       Suite di test automatici
 AnalisiPatente.spec        Configurazione PyInstaller
 SCHEMA TEST PATENTE.xlsx   Dataset Excel predefinito
@@ -206,6 +222,11 @@ La suite verifica:
 - gestione dell'emivita non valida;
 - presenza degli slider GUI;
 - menu lingua e cambio italiano/inglese.
+- salvataggio e caricamento dei record;
+- archivio mancante o corrotto;
+- persistenza dopo riavvio dell'app;
+- cancellazione di una singola entry;
+- popup dei risultati e modalita ansia.
 
 Controllo sintattico:
 

@@ -3,6 +3,7 @@ import tempfile
 import tkinter as tk
 import unittest
 from contextlib import contextmanager
+from pathlib import Path
 
 import pandas as pd
 
@@ -14,6 +15,7 @@ from patente_core import (
     distribuzione_errori,
     distribuzione_errori_records,
 )
+from patente_storage import StorageError, load_records, save_records
 
 
 class PatentCoreTestCase(unittest.TestCase):
@@ -132,18 +134,48 @@ class PatentCoreTestCase(unittest.TestCase):
         self.assertLess(stress['prob_stress'], stress['prob_base'])
         self.assertEqual(distribution, {0: 1, 1: 0, 2: 0, 3: 0, 4: 1})
 
+    def test_storage_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "records.json"
+            records = [{"data": "2026-09-16", "errori": 2}]
+            save_records(records, path)
+            self.assertEqual(load_records(path), records)
+
+    def test_storage_missing_file_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.assertEqual(load_records(Path(tmpdir) / "missing.json"), [])
+
+    def test_storage_rejects_corrupt_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "records.json"
+            path.write_text("{broken", encoding="utf-8")
+            with self.assertRaises(StorageError):
+                load_records(path)
+
+    def test_storage_rejects_invalid_record_schema(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "records.json"
+            save_records([{"data": "2026-09-16", "errori": 1}], path)
+            path.write_text("[{\"wrong\": 1}]", encoding="utf-8")
+            with self.assertRaises(StorageError):
+                load_records(path)
+
 
 class PatentGuiTestCase(unittest.TestCase):
     def setUp(self):
         try:
             from patente_gui import PatentApp
-            self.app = PatentApp()
+            self.storage_directory = tempfile.TemporaryDirectory()
+            self.storage_path = Path(self.storage_directory.name) / "records.json"
+            self.app = PatentApp(storage_path=self.storage_path)
         except tk.TclError as error:
             self.skipTest(f'GUI non disponibile in questo ambiente: {error}')
 
     def tearDown(self):
         if getattr(self, 'app', None) is not None:
             self.app.destroy()
+        if getattr(self, 'storage_directory', None) is not None:
+            self.storage_directory.cleanup()
 
     def test_gui_has_parameter_sliders_and_language_menu(self):
         widgets = []
@@ -202,6 +234,29 @@ class PatentGuiTestCase(unittest.TestCase):
         self.app.analysis_mode_var.set('stress')
         self.app._toggle_anxiety_slider()
         self.assertEqual(anxiety_scales[0].cget('state'), 'normal')
+
+    def test_gui_persists_and_deletes_single_record(self):
+        self.app.entry_date_var.set('2026-09-16')
+        self.app.entry_errors_var.set(2)
+        self.app._add_record()
+        self.assertEqual(load_records(self.storage_path), [{"data": "2026-09-16", "errori": 2}])
+
+        self.app.entry_tree.selection_set(self.app.entry_tree.get_children()[0])
+        self.app._remove_record()
+        self.assertEqual(load_records(self.storage_path), [])
+
+    def test_gui_reloads_saved_records(self):
+        save_records([{"data": "2026-09-15", "errori": 1}], self.storage_path)
+        self.app.destroy()
+        self.app = __import__('patente_gui', fromlist=['PatentApp']).PatentApp(storage_path=self.storage_path)
+        self.app.update_idletasks()
+        self.assertEqual(self.app.records, [{"data": "2026-09-15", "errori": 1}])
+
+    def test_gui_clear_all_is_persistent(self):
+        self.app.records.append({"data": "2026-09-15", "errori": 1})
+        self.app._persist_records()
+        self.app._clear_records()
+        self.assertEqual(load_records(self.storage_path), [])
 
 
 if __name__ == '__main__':
